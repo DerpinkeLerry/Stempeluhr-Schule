@@ -1,0 +1,156 @@
+body {
+    min-height: 100vh;
+    background: #101722;
+    color: #e8edf3;
+}
+
+.navbar {
+    background: #172131;
+    border-bottom: 1px solid #2b394b;
+}
+
+.card,
+.list-group-item {
+    background: #182231;
+    color: #e8edf3;
+    border-color: #314055;
+}
+
+.table {
+    --bs-table-bg: transparent;
+    --bs-table-color: #e8edf3;
+    --bs-table-border-color: #314055;
+    --bs-table-hover-bg: #202d3e;
+    --bs-table-hover-color: #fff;
+}
+
+.table thead th {
+    background: #202c3b;
+    color: #b9c6d6;
+}
+
+.form-control,
+.form-select {
+    background: #111923;
+    border-color: #3b4b60;
+    color: #f1f5f9;
+}
+
+.form-control:focus,
+.form-select:focus {
+    background: #111923;
+    color: #fff;
+}
+
+.form-control::placeholder {
+    color: #7d8a99;
+}
+
+.text-secondary {
+    color: #9aabba !important;
+}
+
+.status-big {
+    font-size: 1.05rem;
+    padding: .65rem 1rem;
+}
+
+.time-display {
+    font-size: clamp(2.8rem, 8vw, 5rem);
+    font-weight: 700;
+    letter-spacing: .08em;
+}
+
+.clock-card {
+    border: 1px solid #33465d;
+    box-shadow: 0 18px 45px rgba(0, 0, 0, .2);
+}
+
+.action-grid {
+    display: grid;
+    gap: .8rem;
+}
+
+.action-grid .btn {
+    padding: 1rem;
+    font-weight: 600;
+}
+
+.break-row {
+    display: flex;
+    justify-content: space-between;
+    padding: .8rem 0;
+    border-bottom: 1px solid #314055;
+}
+
+.break-row:last-child {
+    border-bottom: 0;
+}
+
+.demo-box {
+    font-size: .85rem;
+    color: #aebbc9;
+    background: #182231;
+    border: 1px solid #314055;
+    border-radius: .5rem;
+    padding: .8rem 1rem;
+}
+
+a {
+    color: #7db5ff;
+}
+
+.on-break .clock-card {
+    border-color: #d5a62e;
+    box-shadow: 0 0 30px rgba(213, 166, 46, .16);
+}
+
+.clock-card .time-display {
+    font-size: clamp(2rem, 4vw, 3.2rem);
+}
+
+.modal-content {
+    background: #182231;
+    color: #e8edf3;
+    border-color: #314055;
+}
+
+.modal-header,
+.modal-footer {
+    border-color: #314055;
+}
+
+.report-check {
+    padding: .8rem 1rem .8rem 2.5rem;
+    background: #111923;
+    border: 1px solid #314055;
+    border-radius: .5rem;
+}
+
+.report-employee-list {
+    display: grid;
+    gap: .6rem;
+}
+
+.report-employee-item {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    padding: .8rem 1rem;
+    background: #111923;
+    border: 1px solid #314055;
+    border-radius: .5rem;
+    cursor: pointer;
+}
+
+.report-employee-item:hover {
+    border-color: #6381a5;
+}
+
+.report-employee-item span {
+    display: grid;
+}
+
+.report-employee-item small {
+    color: #9aabba;
+}
