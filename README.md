@@ -1,6 +1,6 @@
-# Stempeluhr
+# WEPRO Zeiterfassung
 
-Kleine Stempeluhr mit PHP und SQLite.
+Digitale Zeiterfassung mit PHP und SQLite im Design der WEPRO GmbH.
 
 ## Funktionen
 
@@ -110,3 +110,17 @@ Imagick wird nicht gebraucht. Wenn beim Start eine Warnung zu `php_imagick.dll` 
 Im Wochenzettel werden keine Buchungsanzahlen angezeigt. Bei Urlaub oder Krankheit werden normale Werktage von Montag bis Freitag mit 8 Stunden 30 Minuten Arbeitszeit angerechnet. In der Bemerkung steht weiterhin Urlaub oder Krank. Samstage und Sonntage werden nicht automatisch angerechnet.
 
 Im Wochenzettel sind Abwesenheiten farblich markiert: Krank hellgelb, Urlaub hellblau und Schule oder Sonstiges hellgrün. Normale Arbeitstage bleiben ohne Hintergrundfarbe.
+
+## WEPRO-Design
+
+Die Oberfläche wurde an den Markenauftritt der WEPRO GmbH in Kaufbeuren angelehnt:
+
+- dunkles Navy als Grundfarbe
+- Orange als Aktions- und Signalfarbe
+- helle, großzügige Arbeitsflächen
+- abstrahierte Netzwerk- und Zeiterfassungsformen
+- responsive WEPRO-Wortmarke und eigenes Favicon
+
+Die fachlichen Funktionen und die vorhandene SQLite-Datenbank bleiben unverändert.
+
+Bootstrap ist lokal unter `public/assets/` eingebunden. Die Oberfläche funktioniert daher auch ohne Internetverbindung.

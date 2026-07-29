@@ -10,7 +10,7 @@ final class Controller
         $this->service = new TimeClockService(db());
     }
 
-    public function render(string $view, array $vars = [], string $title = 'Stempeluhr'): void
+    public function render(string $view, array $vars = [], string $title = 'WEPRO Zeiterfassung'): void
     {
         start_session();
         $flash = $_SESSION['flash'] ?? [];
@@ -75,7 +75,7 @@ final class Controller
             $totals[$id] = $this->service->getTodayTotals($id);
         }
         $week = $this->service->getCurrentWeekInfo();
-        $this->render('dashboard', compact('employees', 'statuses', 'totals', 'week'), 'Stempeluhr - Übersicht');
+        $this->render('dashboard', compact('employees', 'statuses', 'totals', 'week'), 'WEPRO Zeiterfassung - Übersicht');
     }
 
     public function pageEmployee(): void
@@ -93,7 +93,7 @@ final class Controller
         $totals = $this->service->getTodayTotals($id);
         $sessions = $this->service->listRecentSessions($id, 20);
         $absences = $this->service->listAbsences($id, 30);
-        $this->render('employee', compact('employee', 'status', 'totals', 'sessions', 'absences'), 'Stempeluhr - ' . $employee['name']);
+        $this->render('employee', compact('employee', 'status', 'totals', 'sessions', 'absences'), 'WEPRO Zeiterfassung - ' . $employee['name']);
     }
 
     public function pageHolidays(): void
@@ -105,7 +105,7 @@ final class Controller
             $year = (int)date('Y');
         }
         $holidays = $this->service->listHolidaysForYear($region, $year);
-        $this->render('holidays', compact('region', 'year', 'holidays'), 'Stempeluhr - Feiertage');
+        $this->render('holidays', compact('region', 'year', 'holidays'), 'WEPRO Zeiterfassung - Feiertage');
     }
 
     public function pageMe(): void
@@ -118,7 +118,7 @@ final class Controller
         $status = $this->service->getLiveStatus($id);
         $totals = $this->service->getTodayTotals($id);
         $breaks = $this->service->listTodayBreaks($id);
-        $this->render('me', compact('employee', 'status', 'totals', 'breaks'), 'Meine Stempeluhr');
+        $this->render('me', compact('employee', 'status', 'totals', 'breaks'), 'WEPRO Zeiterfassung - Meine Zeit');
     }
 
     public function pageLogin(): void
@@ -339,21 +339,23 @@ final class Controller
         $week = $report['week'];
         $employee = $employeeReport['employee'];
 
-        $pdf->text(35, 48, 18, 'Arbeitszeitnachweis', true);
-        $pdf->text(35, 76, 11, 'Mitarbeiter: ' . $employee['name'], true);
-        $pdf->text(35, 96, 10, 'Kalenderwoche: KW ' . sprintf('%02d', $week['week']) . ' / ' . $week['year']);
-        $pdf->text(35, 113, 10, 'Zeitraum: ' . $week['start_label'] . ' bis ' . $week['end_label']);
-        $pdf->text(405, 96, 8, 'Erstellt: ' . $report['created_at']);
+        $pdf->rectColor(0, 0, 595.28, 12, 1.000, 0.694, 0.169);
+        $pdf->textColor(35, 34, 9.5, 'WEPRO GMBH - KAUFBEUREN', 0.094, 0.184, 0.314, true);
+        $pdf->textColor(35, 59, 18, 'Arbeitszeitnachweis', 0.094, 0.184, 0.314, true);
+        $pdf->text(35, 84, 11, 'Mitarbeiter: ' . $employee['name'], true);
+        $pdf->text(35, 104, 10, 'Kalenderwoche: KW ' . sprintf('%02d', $week['week']) . ' / ' . $week['year']);
+        $pdf->text(35, 121, 10, 'Zeitraum: ' . $week['start_label'] . ' bis ' . $week['end_label']);
+        $pdf->text(405, 104, 8, 'Erstellt: ' . $report['created_at']);
 
         $left = 35.0;
-        $top = 145.0;
+        $top = 151.0;
         $rowHeight = 34.0;
         $widths = [42.0, 62.0, 55.0, 55.0, 58.0, 72.0, 181.0];
         $headers = ['Tag', 'Datum', 'Beginn', 'Ende', 'Pause', 'Arbeitszeit', 'Bemerkung'];
         $tableWidth = array_sum($widths);
         $tableHeight = $rowHeight * 8;
 
-        $pdf->rect($left, $top, $tableWidth, $rowHeight, true, 0.90);
+        $pdf->rectColor($left, $top, $tableWidth, $rowHeight, 1.000, 0.953, 0.855);
 
         foreach ($employeeReport['days'] as $rowIndex => $day) {
             $color = match ($day['absence_type'] ?? null) {
@@ -405,7 +407,7 @@ final class Controller
         }
 
         $summaryTop = $top + $tableHeight + 28;
-        $pdf->rect(330, $summaryTop, 230, 58, true, 0.94);
+        $pdf->rectColor(330, $summaryTop, 230, 58, 1.000, 0.965, 0.890);
         $pdf->rect(330, $summaryTop, 230, 58);
         $pdf->text(342, $summaryTop + 22, 10, 'Arbeitszeit gesamt:', true);
         $pdf->text(495, $summaryTop + 22, 10, $this->pdfDuration((int)$employeeReport['work_seconds']), true);
@@ -415,7 +417,8 @@ final class Controller
         $pdf->text(35, 565, 10, 'Die oben aufgeführten Arbeitszeiten wurden geprüft.');
         $pdf->line(120, 675, 560, 675);
         $pdf->text(120, 691, 8.5, 'Unterschrift Arbeitnehmer');
-        $pdf->text(35, 810, 8, 'Stempeluhr - Wochenzettel');
+        $pdf->rectColor(35, 789, 525, 2, 1.000, 0.694, 0.169);
+        $pdf->textColor(35, 810, 8, 'WEPRO Zeiterfassung - Wochenzettel', 0.094, 0.184, 0.314, true);
         $pdf->text(495, 810, 8, 'Seite ' . $page . ' von ' . $total);
     }
 

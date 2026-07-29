@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 92" role="img" aria-labelledby="title desc">
+  <title id="title">wepro Zeiterfassung</title>
+  <desc id="desc">WEPRO Wortmarke mit orangem Zeiterfassungs-Symbol</desc>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="43" cy="46" r="31" stroke="#ffb12b" stroke-width="6"/>
+    <path d="M43 28v19l14 9" stroke="#ffffff" stroke-width="6"/>
+    <path d="M20 15h14M52 15h14" stroke="#ffb12b" stroke-width="5"/>
+  </g>
+  <text x="88" y="57" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="54" font-weight="650" letter-spacing="-3">wepro</text>
+  <text x="91" y="79" fill="#ffb12b" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="700" letter-spacing="2.7">ZEITERFASSUNG</text>
+</svg>

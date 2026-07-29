@@ -4,7 +4,7 @@ declare(strict_types=1);
 <div class="d-flex justify-content-between align-items-center mb-4 gap-3 flex-wrap">
     <div>
         <h1 class="h3 mb-1">Mitarbeiter</h1>
-        <div class="text-secondary">Aktueller Stand der Stempeluhr</div>
+        <div class="text-secondary">Aktueller Stand der Zeiterfassung</div>
     </div>
     <div class="d-flex gap-2">
         <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#weekReportModal">Wochenzettel PDF</button>
@@ -94,7 +94,7 @@ declare(strict_types=1);
                         <h2 class="modal-title fs-5">Wochenzettel drucken</h2>
                         <div class="small text-secondary">KW <?= h(sprintf('%02d', $week['week'])) ?> · <?= h($week['start_label']) ?> bis <?= h($week['end_label']) ?></div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Schließen"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
                 </div>
                 <div class="modal-body">
                     <div class="form-check report-check mb-3">

@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 return [
-    'app_name' => 'Stempeluhr',
+    'app_name' => 'WEPRO Zeiterfassung',
     'database_file' => __DIR__ . '/../data/stempeluhr.sqlite',
     'default_timezone' => 'Europe/Berlin',
     'default_holiday_region' => 'DE-BY-KF',

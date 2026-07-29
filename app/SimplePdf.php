@@ -23,6 +23,16 @@ final class SimplePdf
         $this->current .= sprintf("BT /%s %.2F Tf %.2F %.2F Td (%s) Tj ET\n", $font, $size, $x, $y, $this->escape($text));
     }
 
+    public function textColor(float $x, float $top, float $size, string $text, float $red, float $green, float $blue, bool $bold = false): void
+    {
+        $font = $bold ? 'F2' : 'F1';
+        $y = self::HEIGHT - $top;
+        $red = max(0.0, min(1.0, $red));
+        $green = max(0.0, min(1.0, $green));
+        $blue = max(0.0, min(1.0, $blue));
+        $this->current .= sprintf("%.3F %.3F %.3F rg BT /%s %.2F Tf %.2F %.2F Td (%s) Tj ET 0 g\n", $red, $green, $blue, $font, $size, $x, $y, $this->escape($text));
+    }
+
     public function line(float $x1, float $top1, float $x2, float $top2, float $width = 0.7): void
     {
         $y1 = self::HEIGHT - $top1;
