@@ -317,7 +317,9 @@ textarea {
 }
 
 .page-enter {
-    animation: page-enter .52s cubic-bezier(.2, .7, .25, 1) both;
+    /* Do not retain the final transform: a retained transform creates a stacking
+       context that can place Bootstrap's backdrop above nested modals. */
+    animation: page-enter .52s cubic-bezier(.2, .7, .25, 1);
 }
 
 @keyframes page-enter {
@@ -1680,6 +1682,14 @@ textarea {
 }
 
 /* Modals and reports */
+.modal {
+    z-index: 1060;
+}
+
+.modal-backdrop {
+    z-index: 1050;
+}
+
 .modal-backdrop.show {
     opacity: .55;
     backdrop-filter: blur(3px);

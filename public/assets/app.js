@@ -2,6 +2,16 @@
     'use strict';
 
     const basePath = window.STEMPELUHR?.basePath || '';
+
+    // Bootstrap modals should be direct children of <body>. The page entrance
+    // animation creates a temporary stacking context; keeping dialogs inside it
+    // can otherwise place the backdrop above the dialog and block all clicks.
+    document.querySelectorAll('.modal').forEach(modal => {
+        if (modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+    });
+
     const dashboardState = new Map();
     let meState = null;
     let employeeState = null;
