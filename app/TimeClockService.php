@@ -104,6 +104,90 @@ final class TimeClockService
         return (int)$this->pdo->lastInsertId();
     }
 
+    public function updateEmployee(
+        int $employeeId,
+        string $name,
+        string $email,
+        string $password,
+        string $role,
+        string $timezone,
+        int $actingAdminId
+    ): void {
+        $employee = $this->getEmployee($employeeId);
+        if (!$employee) {
+            throw new RuntimeException('Mitarbeiter wurde nicht gefunden');
+        }
+
+        $name = trim($name);
+        $email = strtolower(trim($email));
+        if ($name === '' || strlen($name) > 100 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new RuntimeException('Name oder E-Mail ist ungültig');
+        }
+        if (!in_array($role, ['admin', 'employee'], true)) {
+            throw new RuntimeException('Die Rolle ist ungültig');
+        }
+        if ($password !== '' && strlen($password) < 6) {
+            throw new RuntimeException('Das neue Passwort braucht mindestens 6 Zeichen');
+        }
+        try {
+            new DateTimeZone($timezone);
+        } catch (Throwable) {
+            throw new RuntimeException('Die Zeitzone ist ungültig');
+        }
+
+        if ($employeeId === $actingAdminId && $role !== 'admin') {
+            throw new RuntimeException('Das eigene Admin-Konto kann nicht zum Mitarbeiter herabgestuft werden');
+        }
+        if (
+            $employee['role'] === 'admin'
+            && (int)$employee['active'] === 1
+            && $role !== 'admin'
+            && $this->countActiveAdmins() <= 1
+        ) {
+            throw new RuntimeException('Der letzte aktive Admin kann nicht herabgestuft werden');
+        }
+
+        $fields = ['name=?', 'email=?', 'role=?', 'timezone=?'];
+        $values = [$name, $email, $role, $timezone];
+        if ($password !== '') {
+            $fields[] = 'password_hash=?';
+            $values[] = password_hash($password, PASSWORD_DEFAULT);
+        }
+        $values[] = $employeeId;
+
+        try {
+            $st = $this->pdo->prepare('UPDATE employee SET ' . implode(', ', $fields) . ' WHERE id=?');
+            $st->execute($values);
+        } catch (PDOException $e) {
+            if (str_contains(strtolower($e->getMessage()), 'unique')) {
+                throw new RuntimeException('Die E-Mail gibt es schon');
+            }
+            throw $e;
+        }
+    }
+
+    public function deleteEmployee(int $employeeId, int $actingAdminId): void
+    {
+        $employee = $this->getEmployee($employeeId);
+        if (!$employee) {
+            throw new RuntimeException('Mitarbeiter wurde nicht gefunden');
+        }
+        if ($employeeId === $actingAdminId) {
+            throw new RuntimeException('Das aktuell angemeldete Admin-Konto kann nicht gelöscht werden');
+        }
+        if ($employee['role'] === 'admin' && (int)$employee['active'] === 1 && $this->countActiveAdmins() <= 1) {
+            throw new RuntimeException('Der letzte aktive Admin kann nicht gelöscht werden');
+        }
+
+        $st = $this->pdo->prepare('DELETE FROM employee WHERE id=?');
+        $st->execute([$employeeId]);
+    }
+
+    private function countActiveAdmins(): int
+    {
+        return (int)$this->pdo->query("SELECT COUNT(*) FROM employee WHERE role='admin' AND active=1")->fetchColumn();
+    }
+
     public function getOpenWorkSession(int $employeeId): ?array
     {
         $st = $this->pdo->prepare('SELECT * FROM work_session WHERE employee_id=? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1');

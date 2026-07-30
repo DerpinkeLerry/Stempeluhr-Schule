@@ -91,7 +91,8 @@ final class Controller
         }
         $week = $this->service->getCurrentWeekInfo();
         $timezoneOptions = $this->service->listTimezoneOptions();
-        $this->render('dashboard', compact('employees', 'statuses', 'totals', 'week', 'timezoneOptions'), 'Stempeluhr - Übersicht');
+        $currentAdminId = (int)($_SESSION['user_id'] ?? 0);
+        $this->render('dashboard', compact('employees', 'statuses', 'totals', 'week', 'timezoneOptions', 'currentAdminId'), 'Stempeluhr - Übersicht');
     }
 
     public function pageEmployee(): void
@@ -225,6 +226,55 @@ final class Controller
             json_response(['ok' => false, 'error' => $e->getMessage()], 400);
         } catch (Throwable) {
             json_response(['ok' => false, 'error' => 'Mitarbeiter konnte nicht gespeichert werden'], 500);
+        }
+    }
+
+    public function apiEmployeeUpdate(): never
+    {
+        require_post();
+        verify_csrf();
+        $actingAdminId = require_admin(true);
+
+        try {
+            $employeeId = (int)($_POST['employeeId'] ?? 0);
+            $this->service->updateEmployee(
+                $employeeId,
+                (string)($_POST['name'] ?? ''),
+                (string)($_POST['email'] ?? ''),
+                (string)($_POST['password'] ?? ''),
+                (string)($_POST['role'] ?? 'employee'),
+                (string)($_POST['timezone'] ?? 'Europe/Berlin'),
+                $actingAdminId
+            );
+
+            if ($employeeId === $actingAdminId) {
+                $employee = $this->service->getEmployee($employeeId);
+                if ($employee) {
+                    $_SESSION['name'] = $employee['name'];
+                }
+            }
+
+            json_response(['ok' => true]);
+        } catch (RuntimeException $e) {
+            json_response(['ok' => false, 'error' => $e->getMessage()], 400);
+        } catch (Throwable) {
+            json_response(['ok' => false, 'error' => 'Mitarbeiter konnte nicht aktualisiert werden'], 500);
+        }
+    }
+
+    public function apiEmployeeDelete(): never
+    {
+        require_post();
+        verify_csrf();
+        $actingAdminId = require_admin(true);
+
+        try {
+            $this->service->deleteEmployee((int)($_POST['employeeId'] ?? 0), $actingAdminId);
+            json_response(['ok' => true]);
+        } catch (RuntimeException $e) {
+            json_response(['ok' => false, 'error' => $e->getMessage()], 400);
+        } catch (Throwable) {
+            json_response(['ok' => false, 'error' => 'Mitarbeiter konnte nicht gelöscht werden'], 500);
         }
     }
 

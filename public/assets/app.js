@@ -325,6 +325,72 @@
         });
     }
 
+    const employeeEditForm = document.getElementById('formEmployeeEdit');
+    const deleteEmployeeButton = document.getElementById('deleteEmployeeButton');
+    const employeeDeleteHelp = document.getElementById('employeeDeleteHelp');
+    const employeeEditTitle = document.getElementById('employeeEditTitle');
+
+    document.addEventListener('click', event => {
+        const button = event.target.closest('.employee-edit');
+        if (!button || !employeeEditForm) return;
+
+        employeeEditForm.elements.employeeId.value = button.dataset.employeeId || '';
+        employeeEditForm.elements.name.value = button.dataset.name || '';
+        employeeEditForm.elements.email.value = button.dataset.email || '';
+        employeeEditForm.elements.role.value = button.dataset.role || 'employee';
+        employeeEditForm.elements.timezone.value = button.dataset.timezone || 'Europe/Berlin';
+        employeeEditForm.elements.password.value = '';
+
+        const isOwnAccount = button.dataset.employeeId === employeeEditForm.dataset.currentAdminId;
+        if (deleteEmployeeButton) {
+            deleteEmployeeButton.disabled = isOwnAccount;
+            deleteEmployeeButton.dataset.employeeName = button.dataset.name || 'diesen Mitarbeiter';
+        }
+        if (employeeDeleteHelp) {
+            employeeDeleteHelp.textContent = isOwnAccount
+                ? 'Das aktuell angemeldete Admin-Konto kann nicht gelöscht werden.'
+                : 'Arbeitszeiten und Abwesenheiten werden ebenfalls gelöscht.';
+        }
+        if (employeeEditTitle) {
+            employeeEditTitle.textContent = button.dataset.name
+                ? `${button.dataset.name} bearbeiten`
+                : 'Mitarbeiter bearbeiten';
+        }
+    });
+
+    if (employeeEditForm) {
+        employeeEditForm.addEventListener('submit', async event => {
+            event.preventDefault();
+            const submit = employeeEditForm.querySelector('[type="submit"]');
+            setButtonLoading(submit, true);
+            try {
+                await apiPost('/api/employee/update', Object.fromEntries(new FormData(employeeEditForm).entries()));
+                location.reload();
+            } catch (error) {
+                showToast(error.message, 'danger');
+                setButtonLoading(submit, false);
+            }
+        });
+    }
+
+    if (deleteEmployeeButton && employeeEditForm) {
+        deleteEmployeeButton.addEventListener('click', async () => {
+            const employeeId = employeeEditForm.elements.employeeId.value;
+            const employeeName = deleteEmployeeButton.dataset.employeeName || 'diesen Mitarbeiter';
+            if (!employeeId || deleteEmployeeButton.disabled) return;
+            if (!window.confirm(`${employeeName} wirklich dauerhaft löschen? Arbeitszeiten und Abwesenheiten werden ebenfalls gelöscht.`)) return;
+
+            setButtonLoading(deleteEmployeeButton, true);
+            try {
+                await apiPost('/api/employee/delete', {employeeId});
+                location.reload();
+            } catch (error) {
+                showToast(error.message, 'danger');
+                setButtonLoading(deleteEmployeeButton, false);
+            }
+        });
+    }
+
     const absenceForm = document.getElementById('formAbsence');
     if (absenceForm) {
         absenceForm.addEventListener('submit', async event => {

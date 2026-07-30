@@ -154,10 +154,26 @@ foreach ($statuses as $itemStatus) {
                     <td class="status-cell"><?= $this->renderStatusBadge($statuses[$id]) ?></td>
                     <td><span class="today-cell time-value"><?= h(seconds_to_hhmmss($totals[$id]['net_seconds'])) ?></span></td>
                     <td class="text-end">
-                        <a class="btn btn-table-action" href="<?= h(url('/employee?id=' . $id)) ?>">
-                            Details
-                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
-                        </a>
+                        <div class="employee-row-actions">
+                            <button
+                                type="button"
+                                class="btn btn-table-action employee-edit"
+                                data-bs-toggle="modal"
+                                data-bs-target="#employeeEditModal"
+                                data-employee-id="<?= $id ?>"
+                                data-name="<?= h($employee['name']) ?>"
+                                data-email="<?= h($employee['email']) ?>"
+                                data-role="<?= h($employee['role']) ?>"
+                                data-timezone="<?= h($employee['timezone']) ?>"
+                            >
+                                Bearbeiten
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 4 6 6M4 20l4-1 11-11a2 2 0 0 0-3-3L5 16l-1 4Z"/></svg>
+                            </button>
+                            <a class="btn btn-table-action" href="<?= h(url('/employee?id=' . $id)) ?>">
+                                Details
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                            </a>
+                        </div>
                     </td>
                 </tr>
             <?php endforeach; ?>
@@ -169,6 +185,72 @@ foreach ($statuses as $itemStatus) {
     </div>
     <div class="table-empty-filter" id="employeeSearchEmpty" hidden>Keine passenden Mitarbeiter gefunden.</div>
 </section>
+
+<div class="modal fade" id="employeeEditModal" tabindex="-1" aria-labelledby="employeeEditTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <form id="formEmployeeEdit" data-current-admin-id="<?= (int)$currentAdminId ?>">
+                <input type="hidden" name="employeeId">
+                <div class="modal-header">
+                    <div class="modal-title-group">
+                        <div class="eyebrow">Zugang verwalten</div>
+                        <h2 class="modal-title" id="employeeEditTitle">Mitarbeiter bearbeiten</h2>
+                        <p>Daten ändern oder den Zugang dauerhaft löschen.</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="employeeEditName">Name</label>
+                            <input class="form-control" id="employeeEditName" name="name" required maxlength="100" autocomplete="name">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="employeeEditEmail">E-Mail</label>
+                            <input class="form-control" id="employeeEditEmail" name="email" type="email" required autocomplete="email">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="employeeEditRole">Rolle</label>
+                            <select class="form-select" id="employeeEditRole" name="role">
+                                <option value="employee">Mitarbeiter</option>
+                                <option value="admin">Administration</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="employeeEditPassword">Neues Passwort</label>
+                            <input class="form-control" id="employeeEditPassword" name="password" type="password" minlength="6" autocomplete="new-password" placeholder="Leer lassen, um es beizubehalten">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="employeeEditTimezone">Zeitzone</label>
+                            <select class="form-select" id="employeeEditTimezone" name="timezone" required>
+                                <?php foreach ($timezoneOptions as $group => $options): ?>
+                                    <optgroup label="<?= h($group) ?>">
+                                        <?php foreach ($options as $option): ?>
+                                            <option value="<?= h($option['value']) ?>"><?= h($option['label']) ?></option>
+                                        <?php endforeach; ?>
+                                    </optgroup>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer employee-edit-footer">
+                    <div class="employee-delete-area">
+                        <button type="button" class="btn btn-danger" id="deleteEmployeeButton">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V3h8v3M19 6l-1 15H6L5 6M10 11v5M14 11v5"/></svg>
+                            Mitarbeiter löschen
+                        </button>
+                        <small id="employeeDeleteHelp">Arbeitszeiten und Abwesenheiten werden ebenfalls gelöscht.</small>
+                    </div>
+                    <div class="employee-edit-actions">
+                        <button type="button" class="btn btn-quiet" data-bs-dismiss="modal">Abbrechen</button>
+                        <button type="submit" class="btn btn-brand">Änderungen speichern</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <div class="modal fade" id="weekReportModal" tabindex="-1" aria-labelledby="weekReportTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">

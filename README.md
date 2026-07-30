@@ -17,6 +17,8 @@ Für die Darstellung werden Bootstrap 5.3 und Montserrat über CDN geladen. Ohne
 - Arbeitsbeginn frühestens ab 07:30 Uhr
 - Vergessener Feierabend wird am Folgetag mit Warnung korrigiert: 17:00 Uhr, freitags 12:00 Uhr
 - Mitarbeiter mit Zeitzonen-Auswahl anlegen
+- Mitarbeiterdaten, Rolle, Zeitzone und Passwort als Admin bearbeiten
+- Mitarbeiter im Bearbeiten-Dialog inklusive zugehöriger Zeiten und Abwesenheiten löschen
 - Arbeitszeiten und Abwesenheiten anzeigen
 - Abwesenheiten eintragen, bearbeiten und löschen
 - Scrollbare Mitarbeiterauswahl für Wochenzettel mit fest erreichbarem PDF-Button

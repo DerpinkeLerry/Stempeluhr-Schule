@@ -152,6 +152,72 @@ $tests['Zeitzonen-Auswahl enthält Europe/Berlin'] = static function (): void {
     assertTrueValue($found, 'Europe/Berlin fehlt in der Zeitzonen-Auswahl');
 };
 
+$tests['Mitarbeiterdaten und Passwort können aktualisiert werden'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-30 10:00:00');
+    $pdo->prepare('INSERT INTO employee(name, email, password_hash, role, timezone, holiday_region, active, created_at) VALUES(?,?,?,?,?,?,1,?)')
+        ->execute(['Admin', 'admin@example.local', password_hash('admin123', PASSWORD_DEFAULT), 'admin', 'Europe/Berlin', 'DE-BY-KF', '2026-01-01 00:00:00']);
+    $adminId = (int)$pdo->lastInsertId();
+
+    $service->updateEmployee($employeeId, 'Neuer Name', 'neu@example.local', 'neuespasswort', 'admin', 'UTC', $adminId);
+
+    $employee = $service->getEmployee($employeeId);
+    assertSameValue('Neuer Name', $employee['name'], 'Der Name wurde nicht aktualisiert');
+    assertSameValue('neu@example.local', $employee['email'], 'Die E-Mail wurde nicht aktualisiert');
+    assertSameValue('admin', $employee['role'], 'Die Rolle wurde nicht aktualisiert');
+    assertSameValue('UTC', $employee['timezone'], 'Die Zeitzone wurde nicht aktualisiert');
+    $hash = (string)$pdo->query('SELECT password_hash FROM employee WHERE id=' . $employeeId)->fetchColumn();
+    assertTrueValue(password_verify('neuespasswort', $hash), 'Das neue Passwort wurde nicht gespeichert');
+};
+
+$tests['Leeres Passwort behält das vorhandene Passwort'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-30 10:00:00');
+    $originalHash = password_hash('bestehend123', PASSWORD_DEFAULT);
+    $pdo->prepare('UPDATE employee SET password_hash=? WHERE id=?')->execute([$originalHash, $employeeId]);
+    $pdo->prepare('INSERT INTO employee(name, email, password_hash, role, timezone, holiday_region, active, created_at) VALUES(?,?,?,?,?,?,1,?)')
+        ->execute(['Admin', 'admin@example.local', password_hash('admin123', PASSWORD_DEFAULT), 'admin', 'Europe/Berlin', 'DE-BY-KF', '2026-01-01 00:00:00']);
+    $adminId = (int)$pdo->lastInsertId();
+
+    $service->updateEmployee($employeeId, 'Test Mitarbeiter', 'test@example.local', '', 'employee', 'Europe/Berlin', $adminId);
+
+    $savedHash = (string)$pdo->query('SELECT password_hash FROM employee WHERE id=' . $employeeId)->fetchColumn();
+    assertSameValue($originalHash, $savedHash, 'Ein leeres Passwort darf den vorhandenen Hash nicht verändern');
+};
+
+$tests['Mitarbeiter löschen entfernt zugehörige Daten'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-30 10:00:00');
+    $pdo->prepare('INSERT INTO employee(name, email, password_hash, role, timezone, holiday_region, active, created_at) VALUES(?,?,?,?,?,?,1,?)')
+        ->execute(['Admin', 'admin@example.local', password_hash('admin123', PASSWORD_DEFAULT), 'admin', 'Europe/Berlin', 'DE-BY-KF', '2026-01-01 00:00:00']);
+    $adminId = (int)$pdo->lastInsertId();
+    $pdo->prepare('INSERT INTO work_session(employee_id, started_at, ended_at, source) VALUES(?,?,?,?)')
+        ->execute([$employeeId, '2026-07-30 05:30:00', '2026-07-30 08:00:00', 'test']);
+    $workId = (int)$pdo->lastInsertId();
+    $pdo->prepare('INSERT INTO break_session(work_session_id, started_at, ended_at) VALUES(?,?,?)')
+        ->execute([$workId, '2026-07-30 06:30:00', '2026-07-30 07:00:00']);
+    $pdo->prepare('INSERT INTO absence(employee_id, type, start_date, end_date, note, created_at) VALUES(?,?,?,?,?,?)')
+        ->execute([$employeeId, 'VACATION', '2026-08-03', '2026-08-04', '', '2026-07-30 10:00:00']);
+
+    $service->deleteEmployee($employeeId, $adminId);
+
+    assertSameValue(0, (int)$pdo->query('SELECT COUNT(*) FROM employee WHERE id=' . $employeeId)->fetchColumn(), 'Der Mitarbeiter wurde nicht gelöscht');
+    assertSameValue(0, (int)$pdo->query('SELECT COUNT(*) FROM work_session')->fetchColumn(), 'Arbeitszeiten wurden nicht mitgelöscht');
+    assertSameValue(0, (int)$pdo->query('SELECT COUNT(*) FROM break_session')->fetchColumn(), 'Pausen wurden nicht mitgelöscht');
+    assertSameValue(0, (int)$pdo->query('SELECT COUNT(*) FROM absence')->fetchColumn(), 'Abwesenheiten wurden nicht mitgelöscht');
+};
+
+$tests['Eigenes Admin-Konto kann nicht gelöscht oder herabgestuft werden'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-30 10:00:00');
+    $pdo->prepare("UPDATE employee SET role='admin' WHERE id=?")->execute([$employeeId]);
+
+    expectRuntimeException(
+        static fn() => $service->deleteEmployee($employeeId, $employeeId),
+        'aktuell angemeldete Admin-Konto'
+    );
+    expectRuntimeException(
+        static fn() => $service->updateEmployee($employeeId, 'Admin', 'test@example.local', '', 'employee', 'Europe/Berlin', $employeeId),
+        'eigenen Admin-Konto'
+    );
+};
+
 $passed = 0;
 foreach ($tests as $name => $test) {
     $test();

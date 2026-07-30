@@ -57,6 +57,12 @@ switch ($path) {
     case '/api/employee/create':
         $controller->apiEmployeeCreate();
         break;
+    case '/api/employee/update':
+        $controller->apiEmployeeUpdate();
+        break;
+    case '/api/employee/delete':
+        $controller->apiEmployeeDelete();
+        break;
     case '/api/absence/create':
         $controller->apiAbsenceCreate();
         break;

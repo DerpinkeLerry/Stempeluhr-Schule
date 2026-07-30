@@ -509,6 +509,13 @@ textarea {
     height: 14px;
 }
 
+.employee-row-actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: .45rem;
+}
+
 .btn.is-loading {
     position: relative;
     color: transparent !important;
@@ -1784,6 +1791,50 @@ textarea {
 
 .modal-body {
     padding: 1.35rem 1.4rem;
+}
+
+.employee-edit-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.employee-delete-area {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .4rem;
+}
+
+.employee-delete-area small {
+    max-width: 330px;
+    color: var(--wepro-muted);
+    font-size: .68rem;
+    line-height: 1.45;
+}
+
+.employee-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .65rem;
+}
+
+@media (max-width: 767.98px) {
+    .employee-edit-footer {
+        align-items: stretch;
+        flex-direction: column-reverse;
+    }
+
+    .employee-delete-area,
+    .employee-edit-actions {
+        width: 100%;
+    }
+
+    .employee-delete-area .btn,
+    .employee-edit-actions .btn {
+        flex: 1;
+    }
 }
 
 .modal-title-group h2,

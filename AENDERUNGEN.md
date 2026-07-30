@@ -30,6 +30,13 @@
    - Bei Arbeitsbeginn vor 08:00 Uhr wird die Zeit bis 08:00 Uhr zusätzlich gutgeschrieben, zum Beispiel 40 Minuten bei Arbeitsbeginn um 07:50 Uhr.
    - Die Pausenanzeige bewegt sich beim Starten und Beenden einer Pause dezent und flüssig.
 
+7. **Mitarbeiter bearbeiten und löschen**
+   - In der Teamübersicht steht für jeden Mitarbeiter ein Bearbeiten-Dialog zur Verfügung.
+   - Name, E-Mail, Rolle und Zeitzone können geändert werden.
+   - Optional kann ein neues Passwort vergeben werden; ein leeres Passwortfeld behält das bisherige Passwort bei.
+   - Mitarbeiter können direkt im Bearbeiten-Dialog gelöscht werden. Zugehörige Arbeitszeiten, Pausen und Abwesenheiten werden dabei ebenfalls entfernt.
+   - Das aktuell angemeldete Admin-Konto kann weder gelöscht noch zum Mitarbeiter herabgestuft werden.
+
 ## Prüfungen
 
 ```bash
