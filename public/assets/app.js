@@ -51,7 +51,7 @@
             SCHOOL: 'bg-dark border',
             OTHER: 'bg-light text-dark'
         };
-        const className = classes[status?.status] || 'bg-secondary';
+        const className = status?.stale_session ? 'bg-danger' : (classes[status?.status] || 'bg-secondary');
         return `<span class="badge ${className}${large ? ' status-big' : ''}">${escapeHtml(status?.label || 'Unbekannt')}</span>`;
     }
 
@@ -60,9 +60,15 @@
             `<button class="btn btn-lg ${className} tc-action" data-action="${action}" data-employee-id="${employeeId}">${text}</button>`;
 
         if (status?.status === 'NOT_PRESENT' || status?.status === 'HOLIDAY') {
+            if (status?.work_start_allowed === false) {
+                return '<button class="btn btn-lg btn-outline-success" disabled>Arbeitsbeginn ab 07:30 Uhr</button>';
+            }
             return button('work_start', 'Arbeitsbeginn', 'btn-success');
         }
         if (status?.status === 'WORKING') {
+            if (status?.stale_session) {
+                return button('work_end', 'Vergessenen Feierabend korrigieren', 'btn-danger');
+            }
             return button('break_start', 'Pause', 'btn-warning') + button('work_end', 'Feierabend', 'btn-danger');
         }
         if (status?.status === 'ON_BREAK') {
@@ -82,7 +88,7 @@
     }
 
     function liveNetSeconds(state) {
-        const extra = ['WORKING', 'ON_BREAK'].includes(state.status?.status) ? secondsSinceSync(state) : 0;
+        const extra = state.status?.status === 'WORKING' && !state.status?.stale_session ? secondsSinceSync(state) : 0;
         return Number(state.totals?.net_seconds || 0) + extra;
     }
 
@@ -191,8 +197,11 @@
         if (!button) return;
         button.disabled = true;
         try {
-            await apiPost('/api/action', {action: button.dataset.action});
+            const result = await apiPost('/api/action', {action: button.dataset.action});
             await refreshMe();
+            if (result.warning) {
+                alert(result.warning);
+            }
         } catch (error) {
             alert(error.message);
         } finally {

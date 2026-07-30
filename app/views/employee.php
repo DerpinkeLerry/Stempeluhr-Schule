@@ -119,7 +119,7 @@ $typeLabels = ['VACATION' => 'Urlaub', 'SICK' => 'Krank', 'SCHOOL' => 'Schule', 
                 <input type="hidden" name="absenceId">
                 <div class="modal-header">
                     <h2 class="modal-title fs-5">Abwesenheit bearbeiten</h2>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Schließen"></button>
                 </div>
                 <div class="modal-body">
                     <div class="row g-3">

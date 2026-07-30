@@ -1,17 +1,18 @@
-# WEPRO Zeiterfassung
+# Stempeluhr
 
-Digitale Zeiterfassung mit PHP und SQLite im Design der WEPRO GmbH.
+Kleine Stempeluhr mit PHP und SQLite.
 
 ## Funktionen
 
 - Login für Admin und Mitarbeiter
 - Arbeitsbeginn und Feierabend
-- Bezahlte Pausen starten und beenden
-- Arbeitszeit läuft auch während einer Pause weiter
-- Arbeitszeit und Pausenzeit laufen jede Sekunde weiter
-- Mitarbeiter anlegen
+- Pausen starten und beenden; während einer Pause steht die Arbeitszeit
+- Arbeitsbeginn frühestens ab 07:30 Uhr
+- Vergessener Feierabend wird am Folgetag mit Warnung korrigiert: 17:00 Uhr, freitags 12:00 Uhr
+- Mitarbeiter mit Zeitzonen-Auswahl anlegen
 - Arbeitszeiten und Abwesenheiten anzeigen
 - Abwesenheiten eintragen, bearbeiten und löschen
+- Scrollbare Mitarbeiterauswahl für Wochenzettel mit fest erreichbarem PDF-Button
 - Wochenzettel für alle oder ausgewählte Mitarbeiter als PDF
 - Unterschriftsfeld auf jedem Wochenzettel
 - Feiertage für Bayern und Kaufbeuren von 2025 bis 2035
@@ -65,12 +66,13 @@ SCHOOL = Schule
 OTHER = Sonstiges
 ```
 
-Pausen stehen in `break_session`. Es gibt keinen Pausentyp, da alle Pausen bezahlt sind.
+Pausen stehen in `break_session`. Die Pausendauer wird von der Arbeitszeit abgezogen.
 
 ## Wochenzettel
 
 Als Admin gibt es in der Mitarbeiterübersicht den Button `Wochenzettel PDF`.
 Dort können alle oder einzelne Mitarbeiter ausgewählt werden. Das PDF nimmt immer die aktuelle Woche von Montag bis Sonntag. Für jeden Mitarbeiter wird eine eigene Seite mit Unterschriftsfeld erstellt.
+Die Mitarbeiterauswahl ist scrollbar; der Button `PDF öffnen` bleibt im Kopf des Fensters erreichbar.
 
 Für das PDF wird keine zusätzliche PHP-Erweiterung und kein Composer-Paket gebraucht.
 
@@ -111,16 +113,16 @@ Im Wochenzettel werden keine Buchungsanzahlen angezeigt. Bei Urlaub oder Krankhe
 
 Im Wochenzettel sind Abwesenheiten farblich markiert: Krank hellgelb, Urlaub hellblau und Schule oder Sonstiges hellgrün. Normale Arbeitstage bleiben ohne Hintergrundfarbe.
 
-## WEPRO-Design
+## Tests
 
-Die Oberfläche wurde an den Markenauftritt der WEPRO GmbH in Kaufbeuren angelehnt:
+Die reinen Zeitregeln können ohne Datenbank geprüft werden:
 
-- dunkles Navy als Grundfarbe
-- Orange als Aktions- und Signalfarbe
-- helle, großzügige Arbeitsflächen
-- abstrahierte Netzwerk- und Zeiterfassungsformen
-- responsive WEPRO-Wortmarke und eigenes Favicon
+```bash
+php tests/TimeRulesTest.php
+```
 
-Die fachlichen Funktionen und die vorhandene SQLite-Datenbank bleiben unverändert.
+Mit aktiviertem `PDO_SQLite` stehen zusätzliche Integrationstests zur Verfügung:
 
-Bootstrap ist lokal unter `public/assets/` eingebunden. Die Oberfläche funktioniert daher auch ohne Internetverbindung.
+```bash
+php tests/TimeClockServiceTest.php
+```

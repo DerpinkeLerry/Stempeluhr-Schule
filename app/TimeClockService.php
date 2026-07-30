@@ -3,7 +3,12 @@ declare(strict_types=1);
 
 final class TimeClockService
 {
-    public function __construct(private PDO $pdo) {}
+    private $clock;
+
+    public function __construct(private PDO $pdo, ?callable $clock = null)
+    {
+        $this->clock = $clock ?? static fn(): DateTimeImmutable => new DateTimeImmutable('now', new DateTimeZone('UTC'));
+    }
 
     public function listEmployees(): array
     {
@@ -22,6 +27,41 @@ final class TimeClockService
         $st = $this->pdo->prepare('SELECT * FROM employee WHERE email=? AND active=1 LIMIT 1');
         $st->execute([trim($email)]);
         return $st->fetch() ?: null;
+    }
+
+    public function listTimezoneOptions(): array
+    {
+        $groups = [];
+        $now = $this->now();
+        foreach (DateTimeZone::listIdentifiers() as $identifier) {
+            $parts = explode('/', $identifier, 2);
+            $group = count($parts) === 2 ? $parts[0] : 'Weitere';
+            $label = str_replace('_', ' ', $identifier);
+            $offset = $now->setTimezone(new DateTimeZone($identifier))->format('P');
+            $groups[$group][] = [
+                'value' => $identifier,
+                'label' => $label . ' (UTC' . $offset . ')',
+            ];
+        }
+        ksort($groups);
+        return $groups;
+    }
+
+    public static function isWorkStartAllowed(DateTimeImmutable $localNow): bool
+    {
+        return $localNow->format('H:i:s') >= '07:30:00';
+    }
+
+    public static function calculateNetSeconds(int $grossSeconds, int $breakSeconds): int
+    {
+        return max(0, $grossSeconds - $breakSeconds);
+    }
+
+    public static function forgottenSessionEndLocal(DateTimeImmutable $started): DateTimeImmutable
+    {
+        $hour = (int)$started->format('N') === 5 ? 12 : 17;
+        $end = $started->setTime($hour, 0, 0);
+        return $end < $started ? $started : $end;
     }
 
     public function createEmployee(string $name, string $email, string $password, string $role, string $timezone, string $region): int
@@ -76,6 +116,11 @@ final class TimeClockService
             throw new RuntimeException('Benutzer ist nicht aktiv');
         }
 
+        $localNow = $this->now()->setTimezone(new DateTimeZone($employee['timezone']));
+        if (!self::isWorkStartAllowed($localNow)) {
+            throw new RuntimeException('Arbeitsbeginn ist frühestens ab 07:30 Uhr möglich');
+        }
+
         $status = $this->getLiveStatus($employeeId);
         if (in_array($status['status'], ['VACATION', 'SICK', 'SCHOOL', 'OTHER'], true)) {
             throw new RuntimeException('Für heute ist eine Abwesenheit eingetragen');
@@ -102,7 +147,7 @@ final class TimeClockService
         }
     }
 
-    public function endWork(int $employeeId): void
+    public function endWork(int $employeeId): array
     {
         $this->pdo->beginTransaction();
         try {
@@ -111,16 +156,43 @@ final class TimeClockService
                 throw new RuntimeException('Du bist nicht eingestempelt');
             }
 
+            $employee = $this->getEmployee($employeeId);
+            if (!$employee) {
+                throw new RuntimeException('Mitarbeiter wurde nicht gefunden');
+            }
+
             $now = $this->nowUtc();
-            $st = $this->pdo->prepare('UPDATE break_session SET ended_at=? WHERE work_session_id=? AND ended_at IS NULL');
-            $st->execute([$now, $work['id']]);
+            $endAt = $now;
+            $warning = null;
+            if ($this->isStaleWorkSession($work, $employee['timezone'])) {
+                $endAt = $this->forgottenSessionEndUtc($work, $employee['timezone']);
+                $localEnd = $this->parseUtc($endAt)->setTimezone(new DateTimeZone($employee['timezone']));
+                $localStart = $this->parseUtc($work['started_at'])->setTimezone(new DateTimeZone($employee['timezone']));
+                $warning = sprintf(
+                    'Du hast vergessen, dich am %s auszustempeln. Die Arbeitszeit wurde automatisch auf %s Uhr beendet.',
+                    $localStart->format('d.m.Y'),
+                    $localEnd->format('H:i')
+                );
+            }
+
+            $st = $this->pdo->prepare(
+                'UPDATE break_session
+                 SET ended_at = CASE
+                     WHEN started_at >= ? THEN started_at
+                     WHEN ended_at IS NULL OR ended_at > ? THEN ?
+                     ELSE ended_at
+                 END
+                 WHERE work_session_id=?'
+            );
+            $st->execute([$endAt, $endAt, $endAt, $work['id']]);
 
             $st = $this->pdo->prepare('UPDATE work_session SET ended_at=? WHERE id=? AND ended_at IS NULL');
-            $st->execute([$now, $work['id']]);
+            $st->execute([$endAt, $work['id']]);
             if ($st->rowCount() !== 1) {
                 throw new RuntimeException('Feierabend konnte nicht gespeichert werden');
             }
             $this->pdo->commit();
+            return $warning === null ? [] : ['warning' => $warning, 'corrected_at' => $endAt];
         } catch (Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
@@ -136,6 +208,13 @@ final class TimeClockService
             $work = $this->getOpenWorkSession($employeeId);
             if (!$work) {
                 throw new RuntimeException('Du bist nicht am Arbeiten');
+            }
+            $employee = $this->getEmployee($employeeId);
+            if (!$employee) {
+                throw new RuntimeException('Mitarbeiter wurde nicht gefunden');
+            }
+            if ($this->isStaleWorkSession($work, $employee['timezone'])) {
+                throw new RuntimeException('Du hast das Ausstempeln vergessen. Bitte zuerst den vergessenen Feierabend korrigieren.');
             }
             if ($this->getOpenBreak((int)$work['id'])) {
                 throw new RuntimeException('Die Pause läuft schon');
@@ -180,13 +259,21 @@ final class TimeClockService
 
         $work = $this->getOpenWorkSession($employeeId);
         if ($work) {
-            if ($this->getOpenBreak((int)$work['id'])) {
-                return ['status' => 'ON_BREAK', 'label' => 'Pause'];
+            if ($this->isStaleWorkSession($work, $employee['timezone'])) {
+                return [
+                    'status' => 'WORKING',
+                    'label' => 'Ausstempeln vergessen',
+                    'stale_session' => true,
+                ];
             }
-            return ['status' => 'WORKING', 'label' => 'Arbeitet'];
+            if ($this->getOpenBreak((int)$work['id'])) {
+                return ['status' => 'ON_BREAK', 'label' => 'Pause', 'stale_session' => false];
+            }
+            return ['status' => 'WORKING', 'label' => 'Arbeitet', 'stale_session' => false];
         }
 
-        $today = (new DateTimeImmutable('now', new DateTimeZone($employee['timezone'])))->format('Y-m-d');
+        $localNow = $this->now()->setTimezone(new DateTimeZone($employee['timezone']));
+        $today = $localNow->format('Y-m-d');
         $absence = $this->findAbsence($employeeId, $today);
         if ($absence) {
             $labels = ['VACATION' => 'Urlaub', 'SICK' => 'Krank', 'SCHOOL' => 'Schule', 'OTHER' => 'Abwesend'];
@@ -194,10 +281,20 @@ final class TimeClockService
         }
 
         if ($this->isHoliday($employee['holiday_region'], $today)) {
-            return ['status' => 'HOLIDAY', 'label' => 'Feiertag'];
+            return [
+                'status' => 'HOLIDAY',
+                'label' => 'Feiertag',
+                'work_start_allowed' => self::isWorkStartAllowed($localNow),
+                'work_start_available_at' => '07:30',
+            ];
         }
 
-        return ['status' => 'NOT_PRESENT', 'label' => 'Nicht da'];
+        return [
+            'status' => 'NOT_PRESENT',
+            'label' => 'Nicht da',
+            'work_start_allowed' => self::isWorkStartAllowed($localNow),
+            'work_start_available_at' => '07:30',
+        ];
     }
 
     public function getTodayTotals(int $employeeId): array
@@ -216,13 +313,16 @@ final class TimeClockService
         $gross = 0;
         $breakSeconds = 0;
         foreach ($sessions as $session) {
-            $sessionEnd = $session['ended_at'] ?: $now;
+            $sessionEnd = $this->effectiveSessionEndUtc($session, $employee['timezone'], $now);
             $gross += $this->overlapSeconds($session['started_at'], $sessionEnd, $start, $end);
 
             $bs = $this->pdo->prepare('SELECT * FROM break_session WHERE work_session_id=? AND started_at < ? AND COALESCE(ended_at, ?) > ?');
             $bs->execute([$session['id'], $end, $now, $start]);
             foreach ($bs->fetchAll() as $break) {
-                $breakEnd = $break['ended_at'] ?: $now;
+                $breakEnd = $break['ended_at'] ?: $sessionEnd;
+                if ($breakEnd > $sessionEnd) {
+                    $breakEnd = $sessionEnd;
+                }
                 $breakSeconds += $this->overlapSeconds($break['started_at'], $breakEnd, $start, $end);
             }
         }
@@ -230,7 +330,7 @@ final class TimeClockService
         return [
             'gross_seconds' => $gross,
             'break_seconds' => $breakSeconds,
-            'net_seconds' => $gross,
+            'net_seconds' => self::calculateNetSeconds($gross, $breakSeconds),
         ];
     }
 
@@ -242,13 +342,27 @@ final class TimeClockService
         }
         [$start, $end] = $this->dayRangeUtc($employee['timezone']);
         $now = $this->nowUtc();
-        $st = $this->pdo->prepare('SELECT b.* FROM break_session b JOIN work_session w ON w.id=b.work_session_id WHERE w.employee_id=? AND b.started_at < ? AND COALESCE(b.ended_at, ?) > ? ORDER BY b.started_at DESC');
+        $st = $this->pdo->prepare('SELECT b.*, w.started_at AS work_started_at, w.ended_at AS work_ended_at FROM break_session b JOIN work_session w ON w.id=b.work_session_id WHERE w.employee_id=? AND b.started_at < ? AND COALESCE(b.ended_at, ?) > ? ORDER BY b.started_at DESC');
         $st->execute([$employeeId, $end, $now, $start]);
         $rows = $st->fetchAll();
-        foreach ($rows as &$row) {
-            $row['duration_seconds'] = $this->overlapSeconds($row['started_at'], $row['ended_at'] ?: $now, $start, $end);
+        $visibleRows = [];
+        foreach ($rows as $row) {
+            $work = [
+                'started_at' => $row['work_started_at'],
+                'ended_at' => $row['work_ended_at'],
+            ];
+            $sessionEnd = $this->effectiveSessionEndUtc($work, $employee['timezone'], $now);
+            $breakEnd = $row['ended_at'] ?: $sessionEnd;
+            if ($breakEnd > $sessionEnd) {
+                $breakEnd = $sessionEnd;
+            }
+            $row['duration_seconds'] = $this->overlapSeconds($row['started_at'], $breakEnd, $start, $end);
+            unset($row['work_started_at'], $row['work_ended_at']);
+            if ($row['duration_seconds'] > 0) {
+                $visibleRows[] = $row;
+            }
         }
-        return $rows;
+        return $visibleRows;
     }
 
     public function listRecentSessions(int $employeeId, int $limit = 14): array
@@ -258,19 +372,26 @@ final class TimeClockService
         $st->execute([$employeeId]);
         $sessions = $st->fetchAll();
         $now = $this->nowUtc();
+        $employee = $this->getEmployee($employeeId);
 
         foreach ($sessions as &$session) {
-            $end = $session['ended_at'] ?: $now;
+            $end = $employee
+                ? $this->effectiveSessionEndUtc($session, $employee['timezone'], $now)
+                : ($session['ended_at'] ?: $now);
             $gross = $this->overlapSeconds($session['started_at'], $end, $session['started_at'], $end);
             $bs = $this->pdo->prepare('SELECT started_at, ended_at FROM break_session WHERE work_session_id=?');
             $bs->execute([$session['id']]);
             $breakSeconds = 0;
             foreach ($bs->fetchAll() as $break) {
-                $breakSeconds += $this->overlapSeconds($break['started_at'], $break['ended_at'] ?: $now, $break['started_at'], $break['ended_at'] ?: $now);
+                $breakEnd = $break['ended_at'] ?: $end;
+                if ($breakEnd > $end) {
+                    $breakEnd = $end;
+                }
+                $breakSeconds += $this->overlapSeconds($break['started_at'], $breakEnd, $session['started_at'], $end);
             }
             $session['gross_seconds'] = $gross;
             $session['break_seconds'] = $breakSeconds;
-            $session['net_seconds'] = $gross;
+            $session['net_seconds'] = self::calculateNetSeconds($gross, $breakSeconds);
         }
         return $sessions;
     }
@@ -349,7 +470,7 @@ final class TimeClockService
     public function getCurrentWeekInfo(): array
     {
         $timezone = new DateTimeZone('Europe/Berlin');
-        $now = new DateTimeImmutable('now', $timezone);
+        $now = $this->now()->setTimezone($timezone);
         $start = $now->setTime(0, 0)->modify('-' . ((int)$now->format('N') - 1) . ' days');
         $end = $start->modify('+6 days');
 
@@ -428,7 +549,7 @@ final class TimeClockService
                 $breakSeconds = 0;
 
                 foreach ($sessions as $session) {
-                    $sessionEnd = $session['ended_at'] ?: $nowUtc;
+                    $sessionEnd = $this->effectiveSessionEndUtc($session, $employee['timezone'], $nowUtc);
                     $seconds = $this->overlapSeconds($session['started_at'], $sessionEnd, $dayStartUtc, $dayEndUtc);
                     if ($seconds < 1) {
                         continue;
@@ -439,15 +560,20 @@ final class TimeClockService
                     $endTs = min(strtotime($sessionEnd . ' UTC'), strtotime($dayEndUtc . ' UTC'));
                     $firstStart = $firstStart === null ? $startTs : min($firstStart, $startTs);
                     $lastEnd = $lastEnd === null ? $endTs : max($lastEnd, $endTs);
-                    if (!$session['ended_at'] && $endTs === strtotime($nowUtc . ' UTC')) {
+                    if (!$session['ended_at'] && !$this->isStaleWorkSession($session, $employee['timezone']) && $endTs === strtotime($nowUtc . ' UTC')) {
                         $hasOpenSession = true;
                     }
 
                     foreach ($breaksBySession[(int)$session['id']] ?? [] as $break) {
-                        $breakEnd = $break['ended_at'] ?: $nowUtc;
+                        $breakEnd = $break['ended_at'] ?: $sessionEnd;
+                        if ($breakEnd > $sessionEnd) {
+                            $breakEnd = $sessionEnd;
+                        }
                         $breakSeconds += $this->overlapSeconds($break['started_at'], $breakEnd, $dayStartUtc, $dayEndUtc);
                     }
                 }
+
+                $workSeconds = self::calculateNetSeconds($workSeconds, $breakSeconds);
 
                 $noteParts = [];
                 $creditAbsence = false;
@@ -491,7 +617,7 @@ final class TimeClockService
             ];
         }
 
-        return ['week' => $week, 'employees' => $reports, 'created_at' => (new DateTimeImmutable('now', $timezone))->format('d.m.Y H:i')];
+        return ['week' => $week, 'employees' => $reports, 'created_at' => $this->now()->setTimezone($timezone)->format('d.m.Y H:i')];
     }
 
     public function listHolidaysForYear(string $region, int $year): array
@@ -520,7 +646,7 @@ final class TimeClockService
     private function dayRangeUtc(string $timezone): array
     {
         $tz = new DateTimeZone($timezone);
-        $localStart = new DateTimeImmutable('today', $tz);
+        $localStart = $this->now()->setTimezone($tz)->setTime(0, 0);
         $localEnd = $localStart->modify('+1 day');
         $utc = new DateTimeZone('UTC');
         return [
@@ -544,6 +670,50 @@ final class TimeClockService
 
     private function nowUtc(): string
     {
-        return gmdate('Y-m-d H:i:s');
+        return $this->now()->format('Y-m-d H:i:s');
+    }
+
+    private function now(): DateTimeImmutable
+    {
+        $now = ($this->clock)();
+        if (!$now instanceof DateTimeImmutable) {
+            throw new RuntimeException('Die interne Uhr liefert keinen gültigen Zeitpunkt');
+        }
+        return $now->setTimezone(new DateTimeZone('UTC'));
+    }
+
+    private function parseUtc(string $value): DateTimeImmutable
+    {
+        return new DateTimeImmutable($value, new DateTimeZone('UTC'));
+    }
+
+    private function isStaleWorkSession(array $work, string $timezone): bool
+    {
+        if (!empty($work['ended_at'])) {
+            return false;
+        }
+        $tz = new DateTimeZone($timezone);
+        $startedDay = $this->parseUtc((string)$work['started_at'])->setTimezone($tz)->format('Y-m-d');
+        $today = $this->now()->setTimezone($tz)->format('Y-m-d');
+        return $startedDay < $today;
+    }
+
+    private function forgottenSessionEndUtc(array $work, string $timezone): string
+    {
+        $tz = new DateTimeZone($timezone);
+        $started = $this->parseUtc((string)$work['started_at'])->setTimezone($tz);
+        $end = self::forgottenSessionEndLocal($started);
+        return $end->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s');
+    }
+
+    private function effectiveSessionEndUtc(array $session, string $timezone, string $nowUtc): string
+    {
+        if (!empty($session['ended_at'])) {
+            return (string)$session['ended_at'];
+        }
+        if ($this->isStaleWorkSession($session, $timezone)) {
+            return $this->forgottenSessionEndUtc($session, $timezone);
+        }
+        return $nowUtc;
     }
 }
