@@ -25,26 +25,35 @@ final class Controller
     public function renderStatusBadge(array $status, bool $large = false): string
     {
         $classes = [
-            'WORKING' => 'bg-success',
-            'ON_BREAK' => 'bg-warning text-dark',
-            'NOT_PRESENT' => 'bg-secondary',
-            'HOLIDAY' => 'bg-info text-dark',
-            'VACATION' => 'bg-primary',
-            'SICK' => 'bg-danger',
-            'SCHOOL' => 'bg-dark border',
-            'OTHER' => 'bg-light text-dark',
+            'WORKING' => 'status-working',
+            'ON_BREAK' => 'status-break',
+            'NOT_PRESENT' => 'status-away',
+            'HOLIDAY' => 'status-holiday',
+            'VACATION' => 'status-vacation',
+            'SICK' => 'status-sick',
+            'SCHOOL' => 'status-school',
+            'OTHER' => 'status-other',
         ];
         $code = $status['status'] ?? 'UNKNOWN';
-        $class = !empty($status['stale_session']) ? 'bg-danger' : ($classes[$code] ?? 'bg-secondary');
+        $class = !empty($status['stale_session']) ? 'status-stale' : ($classes[$code] ?? 'status-away');
         $size = $large ? ' status-big' : '';
-        return '<span class="badge ' . h($class . $size) . '">' . h($status['label'] ?? 'Unbekannt') . '</span>';
+        return '<span class="status-badge ' . h($class . $size) . '">' . h($status['label'] ?? 'Unbekannt') . '</span>';
     }
 
     public function renderActionButtons(int $employeeId, array $status): string
     {
         $code = $status['status'] ?? 'UNKNOWN';
-        $button = fn(string $action, string $text, string $class, bool $disabled = false) =>
-            '<button class="btn btn-lg ' . h($class) . ' tc-action" data-action="' . h($action) . '" data-employee-id="' . $employeeId . '"' . ($disabled ? ' disabled' : '') . '>' . h($text) . '</button>';
+        $icons = [
+            'work_start' => '<path d="m5 12 4 4L19 6"/>',
+            'break_start' => '<path d="M7 8h8v8a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V8h2ZM15 10h2a3 3 0 0 1 0 6h-2M5 4h10"/>',
+            'break_end' => '<path d="M12 5v14M5 12h14"/>',
+            'work_end' => '<path d="M6 6l12 12M18 6 6 18"/>',
+        ];
+        $button = function (string $action, string $text, string $class, bool $disabled = false) use ($employeeId, $icons): string {
+            $icon = $icons[$action] ?? $icons['work_start'];
+            return '<button class="btn btn-lg ' . h($class) . ' tc-action" data-action="' . h($action) . '" data-employee-id="' . $employeeId . '"' . ($disabled ? ' disabled' : '') . '>'
+                . '<svg viewBox="0 0 24 24" aria-hidden="true">' . $icon . '</svg><span>' . h($text) . '</span></button>';
+        };
 
         if ($code === 'NOT_PRESENT' || $code === 'HOLIDAY') {
             if (($status['work_start_allowed'] ?? true) === false) {
@@ -56,12 +65,12 @@ final class Controller
             if (!empty($status['stale_session'])) {
                 return $button('work_end', 'Vergessenen Feierabend korrigieren', 'btn-danger');
             }
-            return $button('break_start', 'Pause', 'btn-warning') . $button('work_end', 'Feierabend', 'btn-danger');
+            return $button('break_start', 'Pause starten', 'btn-warning') . $button('work_end', 'Feierabend', 'btn-danger');
         }
         if ($code === 'ON_BREAK') {
             return $button('break_end', 'Pause beenden', 'btn-outline-warning') . $button('work_end', 'Feierabend', 'btn-danger');
         }
-        return '<div class="text-secondary">Heute ist eine Abwesenheit eingetragen.</div>';
+        return '<div class="clock-hint">Heute ist eine Abwesenheit eingetragen.</div>';
     }
 
     public function pageDashboard(): void

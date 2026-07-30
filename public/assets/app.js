@@ -1,4 +1,6 @@
 (function () {
+    'use strict';
+
     const basePath = window.STEMPELUHR?.basePath || '';
     const dashboardState = new Map();
     let meState = null;
@@ -32,6 +34,10 @@
             .replaceAll("'", '&#039;');
     }
 
+    function normalizeSearch(value) {
+        return String(value || '').trim().toLocaleLowerCase('de-DE');
+    }
+
     function secondsToTime(seconds) {
         seconds = Math.max(0, Number.parseInt(seconds, 10) || 0);
         const hours = Math.floor(seconds / 3600);
@@ -40,41 +46,80 @@
         return [hours, minutes, rest].map(number => String(number).padStart(2, '0')).join(':');
     }
 
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('appToastContainer');
+        if (!container || !window.bootstrap?.Toast) {
+            window.alert(message);
+            return;
+        }
+
+        const toast = document.createElement('div');
+        const safeType = ['success', 'warning', 'danger', 'info'].includes(type) ? type : 'info';
+        toast.className = `toast toast-${safeType}`;
+        toast.setAttribute('role', 'status');
+        toast.setAttribute('aria-live', 'polite');
+        toast.setAttribute('aria-atomic', 'true');
+        toast.innerHTML = `
+            <div class="toast-body">
+                <span class="toast-dot" aria-hidden="true"></span>
+                <span class="flex-grow-1">${escapeHtml(message)}</span>
+                <button type="button" class="btn-close ms-2" data-bs-dismiss="toast" aria-label="Schließen"></button>
+            </div>
+        `;
+        container.appendChild(toast);
+        const instance = new window.bootstrap.Toast(toast, {delay: type === 'warning' ? 6500 : 4200});
+        toast.addEventListener('hidden.bs.toast', () => toast.remove(), {once: true});
+        instance.show();
+    }
+
     function statusHtml(status, large = false) {
         const classes = {
-            WORKING: 'bg-success',
-            ON_BREAK: 'bg-warning text-dark',
-            NOT_PRESENT: 'bg-secondary',
-            HOLIDAY: 'bg-info text-dark',
-            VACATION: 'bg-primary',
-            SICK: 'bg-danger',
-            SCHOOL: 'bg-dark border',
-            OTHER: 'bg-light text-dark'
+            WORKING: 'status-working',
+            ON_BREAK: 'status-break',
+            NOT_PRESENT: 'status-away',
+            HOLIDAY: 'status-holiday',
+            VACATION: 'status-vacation',
+            SICK: 'status-sick',
+            SCHOOL: 'status-school',
+            OTHER: 'status-other'
         };
-        const className = status?.stale_session ? 'bg-danger' : (classes[status?.status] || 'bg-secondary');
-        return `<span class="badge ${className}${large ? ' status-big' : ''}">${escapeHtml(status?.label || 'Unbekannt')}</span>`;
+        const className = status?.stale_session ? 'status-stale' : (classes[status?.status] || 'status-away');
+        return `<span class="status-badge ${className}${large ? ' status-big' : ''}">${escapeHtml(status?.label || 'Unbekannt')}</span>`;
+    }
+
+    function actionIcon(action) {
+        const icons = {
+            work_start: '<path d="m5 12 4 4L19 6"/>',
+            break_start: '<path d="M7 8h8v8a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4V8h2ZM15 10h2a3 3 0 0 1 0 6h-2M5 4h10"/>',
+            break_end: '<path d="M12 5v14M5 12h14"/>',
+            work_end: '<path d="M6 6l12 12M18 6 6 18"/>'
+        };
+        return `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[action] || icons.work_start}</svg>`;
+    }
+
+    function actionButton(employeeId, action, text, className, disabled = false) {
+        return `<button class="btn btn-lg ${className} tc-action" data-action="${action}" data-employee-id="${employeeId}"${disabled ? ' disabled' : ''}>${actionIcon(action)}<span>${escapeHtml(text)}</span></button>`;
     }
 
     function actionHtml(employeeId, status) {
-        const button = (action, text, className) =>
-            `<button class="btn btn-lg ${className} tc-action" data-action="${action}" data-employee-id="${employeeId}">${text}</button>`;
-
         if (status?.status === 'NOT_PRESENT' || status?.status === 'HOLIDAY') {
             if (status?.work_start_allowed === false) {
-                return '<button class="btn btn-lg btn-outline-success" disabled>Arbeitsbeginn ab 07:30 Uhr</button>';
+                return actionButton(employeeId, 'work_start', 'Arbeitsbeginn ab 07:30 Uhr', 'btn-outline-success', true);
             }
-            return button('work_start', 'Arbeitsbeginn', 'btn-success');
+            return actionButton(employeeId, 'work_start', 'Arbeitsbeginn', 'btn-success');
         }
         if (status?.status === 'WORKING') {
             if (status?.stale_session) {
-                return button('work_end', 'Vergessenen Feierabend korrigieren', 'btn-danger');
+                return actionButton(employeeId, 'work_end', 'Vergessenen Feierabend korrigieren', 'btn-danger');
             }
-            return button('break_start', 'Pause', 'btn-warning') + button('work_end', 'Feierabend', 'btn-danger');
+            return actionButton(employeeId, 'break_start', 'Pause starten', 'btn-warning')
+                + actionButton(employeeId, 'work_end', 'Feierabend', 'btn-danger');
         }
         if (status?.status === 'ON_BREAK') {
-            return button('break_end', 'Pause beenden', 'btn-outline-warning') + button('work_end', 'Feierabend', 'btn-danger');
+            return actionButton(employeeId, 'break_end', 'Pause beenden', 'btn-outline-warning')
+                + actionButton(employeeId, 'work_end', 'Feierabend', 'btn-danger');
         }
-        return '<div class="text-secondary">Heute ist eine Abwesenheit eingetragen.</div>';
+        return '<div class="clock-hint">Heute ist eine Abwesenheit eingetragen.</div>';
     }
 
     function localTime(utc) {
@@ -100,21 +145,37 @@
     function breaksHtml(state) {
         const breaks = state?.breaks || [];
         if (!breaks.length) {
-            return '<div class="text-secondary">Noch keine Pause.</div>';
+            return `
+                <div class="empty-panel">
+                    <span class="empty-panel-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg></span>
+                    <strong>Noch keine Pause</strong>
+                    <p>Gestartete Pausen werden hier automatisch angezeigt.</p>
+                </div>
+            `;
         }
         const extra = secondsSinceSync(state);
-        return breaks.map(item => {
+        return breaks.map((item, index) => {
             let duration = Number(item.duration_seconds || 0);
             if (!item.ended_at && state.status?.status === 'ON_BREAK') {
                 duration += extra;
             }
             return `
                 <div class="break-row">
-                    <div>${localTime(item.started_at)} - ${localTime(item.ended_at)}</div>
-                    <strong>${secondsToTime(duration)}</strong>
+                    <span class="break-number">${index + 1}</span>
+                    <div class="break-time">
+                        <strong>${localTime(item.started_at)} – ${localTime(item.ended_at)}</strong>
+                        <small>Pause</small>
+                    </div>
+                    <strong class="break-duration">${secondsToTime(duration)}</strong>
                 </div>
             `;
         }).join('');
+    }
+
+    function setButtonLoading(button, loading) {
+        if (!button) return;
+        button.disabled = loading;
+        button.classList.toggle('is-loading', loading);
     }
 
     function tickDashboard() {
@@ -123,7 +184,8 @@
         dashboardState.forEach((state, employeeId) => {
             const row = table.querySelector(`[data-employee-id="${employeeId}"]`);
             if (!row) return;
-            row.querySelector('.today-cell').textContent = secondsToTime(liveNetSeconds(state));
+            const cell = row.querySelector('.today-cell');
+            if (cell) cell.textContent = secondsToTime(liveNetSeconds(state));
         });
     }
 
@@ -140,10 +202,13 @@
                 dashboardState.set(item.employee.id, state);
                 const row = table.querySelector(`[data-employee-id="${item.employee.id}"]`);
                 if (!row) return;
-                row.querySelector('.status-cell').innerHTML = statusHtml(item.status);
+                const statusCell = row.querySelector('.status-cell');
+                if (statusCell) statusCell.innerHTML = statusHtml(item.status);
             });
             tickDashboard();
-        } catch (_) {}
+        } catch (_) {
+            // Die vorhandenen Werte bleiben sichtbar, wenn ein kurzer Netzfehler auftritt.
+        }
     }
 
     function tickMe() {
@@ -165,11 +230,15 @@
             if (!result?.ok) return;
 
             meState = {...result, syncedAt: Date.now()};
-            document.getElementById('meStatus').innerHTML = statusHtml(result.status, true);
-            document.getElementById('meActions').innerHTML = actionHtml(root.dataset.employeeId, result.status);
+            const status = document.getElementById('meStatus');
+            const actions = document.getElementById('meActions');
+            if (status) status.innerHTML = statusHtml(result.status, true);
+            if (actions) actions.innerHTML = actionHtml(root.dataset.employeeId, result.status);
             root.classList.toggle('on-break', result.status.status === 'ON_BREAK');
             tickMe();
-        } catch (_) {}
+        } catch (_) {
+            // Bestehende Anzeige beibehalten.
+        }
     }
 
     function tickEmployee() {
@@ -187,25 +256,36 @@
             if (!result?.ok) return;
 
             employeeState = {...result, syncedAt: Date.now()};
-            document.getElementById('employeeStatus').innerHTML = statusHtml(result.status, true);
+            const status = document.getElementById('employeeStatus');
+            if (status) status.innerHTML = statusHtml(result.status, true);
             tickEmployee();
-        } catch (_) {}
+        } catch (_) {
+            // Bestehende Anzeige beibehalten.
+        }
     }
 
     document.addEventListener('click', async event => {
         const button = event.target.closest('.tc-action');
         if (!button) return;
-        button.disabled = true;
+        setButtonLoading(button, true);
         try {
             const result = await apiPost('/api/action', {action: button.dataset.action});
             await refreshMe();
             if (result.warning) {
-                alert(result.warning);
+                showToast(result.warning, 'warning');
+            } else {
+                const messages = {
+                    work_start: 'Arbeitszeit wurde gestartet.',
+                    work_end: 'Arbeitszeit wurde beendet.',
+                    break_start: 'Pause wurde gestartet.',
+                    break_end: 'Pause wurde beendet.'
+                };
+                showToast(messages[button.dataset.action] || 'Änderung wurde gespeichert.', 'success');
             }
         } catch (error) {
-            alert(error.message);
+            showToast(error.message, 'danger');
         } finally {
-            button.disabled = false;
+            setButtonLoading(button, false);
         }
     });
 
@@ -213,11 +293,14 @@
     if (employeeForm) {
         employeeForm.addEventListener('submit', async event => {
             event.preventDefault();
+            const submit = employeeForm.querySelector('[type="submit"]');
+            setButtonLoading(submit, true);
             try {
                 await apiPost('/api/employee/create', Object.fromEntries(new FormData(employeeForm).entries()));
                 location.reload();
             } catch (error) {
-                alert(error.message);
+                showToast(error.message, 'danger');
+                setButtonLoading(submit, false);
             }
         });
     }
@@ -226,13 +309,16 @@
     if (absenceForm) {
         absenceForm.addEventListener('submit', async event => {
             event.preventDefault();
+            const submit = absenceForm.querySelector('[type="submit"]');
             const data = Object.fromEntries(new FormData(absenceForm).entries());
             data.employeeId = absenceForm.dataset.employeeId;
+            setButtonLoading(submit, true);
             try {
                 await apiPost('/api/absence/create', data);
                 location.reload();
             } catch (error) {
-                alert(error.message);
+                showToast(error.message, 'danger');
+                setButtonLoading(submit, false);
             }
         });
     }
@@ -251,11 +337,14 @@
     if (absenceEditForm) {
         absenceEditForm.addEventListener('submit', async event => {
             event.preventDefault();
+            const submit = absenceEditForm.querySelector('[type="submit"]');
+            setButtonLoading(submit, true);
             try {
                 await apiPost('/api/absence/update', Object.fromEntries(new FormData(absenceEditForm).entries()));
                 location.reload();
             } catch (error) {
-                alert(error.message);
+                showToast(error.message, 'danger');
+                setButtonLoading(submit, false);
             }
         });
     }
@@ -263,12 +352,16 @@
     const weekReportForm = document.getElementById('weekReportForm');
     const selectAllEmployees = document.getElementById('selectAllEmployees');
     const reportCheckboxes = Array.from(document.querySelectorAll('.report-employee-checkbox'));
+    const reportSelectionCount = document.getElementById('reportSelectionCount');
 
     function updateReportSelection() {
         if (!selectAllEmployees) return;
         const selected = reportCheckboxes.filter(box => box.checked).length;
         selectAllEmployees.checked = selected === reportCheckboxes.length && reportCheckboxes.length > 0;
         selectAllEmployees.indeterminate = selected > 0 && selected < reportCheckboxes.length;
+        if (reportSelectionCount) {
+            reportSelectionCount.textContent = `${selected} von ${reportCheckboxes.length} ausgewählt`;
+        }
     }
 
     if (selectAllEmployees) {
@@ -279,28 +372,61 @@
             updateReportSelection();
         });
         reportCheckboxes.forEach(box => box.addEventListener('change', updateReportSelection));
+        updateReportSelection();
     }
 
     if (weekReportForm) {
         weekReportForm.addEventListener('submit', event => {
             if (!reportCheckboxes.some(box => box.checked)) {
                 event.preventDefault();
-                alert('Bitte mindestens einen Mitarbeiter auswählen.');
+                showToast('Bitte mindestens einen Mitarbeiter auswählen.', 'warning');
             }
+        });
+    }
+
+    const employeeSearch = document.getElementById('employeeSearch');
+    if (employeeSearch) {
+        const rows = Array.from(document.querySelectorAll('#employeeTable tbody tr[data-employee-id]'));
+        const empty = document.getElementById('employeeSearchEmpty');
+        employeeSearch.addEventListener('input', () => {
+            const query = normalizeSearch(employeeSearch.value);
+            let visible = 0;
+            rows.forEach(row => {
+                const matches = !query || normalizeSearch(row.dataset.search).includes(query);
+                row.hidden = !matches;
+                if (matches) visible++;
+            });
+            if (empty) empty.hidden = visible !== 0;
+        });
+    }
+
+    const reportSearch = document.getElementById('reportEmployeeSearch');
+    if (reportSearch) {
+        const items = Array.from(document.querySelectorAll('.report-employee-item'));
+        const empty = document.getElementById('reportSearchEmpty');
+        reportSearch.addEventListener('input', () => {
+            const query = normalizeSearch(reportSearch.value);
+            let visible = 0;
+            items.forEach(item => {
+                const matches = !query || normalizeSearch(item.dataset.search).includes(query);
+                item.hidden = !matches;
+                if (matches) visible++;
+            });
+            if (empty) empty.hidden = visible !== 0;
         });
     }
 
     document.addEventListener('click', async event => {
         const button = event.target.closest('.absence-delete');
         if (!button) return;
-        if (!confirm('Abwesenheit wirklich löschen?')) return;
+        if (!window.confirm('Abwesenheit wirklich löschen?')) return;
 
         button.disabled = true;
         try {
             await apiPost('/api/absence/delete', {absenceId: button.dataset.absenceId});
             location.reload();
         } catch (error) {
-            alert(error.message);
+            showToast(error.message, 'danger');
             button.disabled = false;
         }
     });

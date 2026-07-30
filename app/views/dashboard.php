@@ -1,127 +1,221 @@
 <?php
 declare(strict_types=1);
+$workingCount = 0;
+$breakCount = 0;
+foreach ($statuses as $itemStatus) {
+    if (($itemStatus['status'] ?? '') === 'WORKING' && empty($itemStatus['stale_session'])) $workingCount++;
+    if (($itemStatus['status'] ?? '') === 'ON_BREAK') $breakCount++;
+}
 ?>
-<div class="d-flex justify-content-between align-items-center mb-4 gap-3 flex-wrap">
-    <div>
-        <h1 class="h3 mb-1">Mitarbeiter</h1>
-        <div class="text-secondary">Aktueller Stand der Stempeluhr</div>
+<section class="page-hero dashboard-hero">
+    <div class="page-hero-copy">
+        <div class="eyebrow">Administration</div>
+        <h1>Mitarbeiter im Blick</h1>
+        <p>Arbeitszeiten, Anwesenheiten und Wochenzettel zentral und übersichtlich verwalten.</p>
     </div>
-    <div class="d-flex gap-2">
-        <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#weekReportModal">Wochenzettel PDF</button>
-        <button class="btn btn-primary" data-bs-toggle="collapse" data-bs-target="#newEmployee">Mitarbeiter anlegen</button>
+    <div class="page-actions">
+        <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#weekReportModal">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>
+            Wochenzettel
+        </button>
+        <button class="btn btn-brand" data-bs-toggle="collapse" data-bs-target="#newEmployee" aria-expanded="false" aria-controls="newEmployee">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            Mitarbeiter anlegen
+        </button>
     </div>
+</section>
+
+<div class="stat-grid" aria-label="Aktuelle Kennzahlen">
+    <article class="stat-card">
+        <span class="stat-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </span>
+        <div><strong><?= count($employees) ?></strong><span>Mitarbeiter gesamt</span></div>
+    </article>
+    <article class="stat-card stat-card-positive">
+        <span class="stat-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+        </span>
+        <div><strong><?= $workingCount ?></strong><span>Aktuell im Dienst</span></div>
+    </article>
+    <article class="stat-card stat-card-accent">
+        <span class="stat-icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2v6M18 2v6M4 8h16M6 12h3M6 16h5M4 4h16v18H4z"/></svg>
+        </span>
+        <div><strong><?= $breakCount ?></strong><span>Aktuell in Pause</span></div>
+    </article>
 </div>
 
-<div class="collapse mb-4" id="newEmployee">
-    <div class="card">
-        <div class="card-body">
-            <form id="formEmployee" class="row g-3">
-                <div class="col-md-4">
-                    <label class="form-label">Name</label>
-                    <input class="form-control" name="name" required maxlength="100">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">E-Mail</label>
-                    <input class="form-control" name="email" type="email" required>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Passwort</label>
-                    <input class="form-control" name="password" type="password" minlength="6" required>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Rolle</label>
-                    <select class="form-select" name="role">
-                        <option value="employee">Mitarbeiter</option>
-                        <option value="admin">Admin</option>
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Zeitzone</label>
-                    <select class="form-select" name="timezone" required>
-                        <?php foreach ($timezoneOptions as $group => $options): ?>
-                            <optgroup label="<?= h($group) ?>">
-                                <?php foreach ($options as $option): ?>
-                                    <option value="<?= h($option['value']) ?>" <?= $option['value'] === 'Europe/Berlin' ? 'selected' : '' ?>><?= h($option['label']) ?></option>
-                                <?php endforeach; ?>
-                            </optgroup>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Standort</label>
-                    <input class="form-control" value="Kaufbeuren, Bayern" disabled>
-                </div>
-                <div class="col-md-2 d-flex align-items-end">
-                    <button class="btn btn-success w-100">Speichern</button>
-                </div>
-            </form>
+<div class="collapse form-collapse" id="newEmployee">
+    <section class="surface-card employee-create-card">
+        <div class="section-heading">
+            <div>
+                <div class="eyebrow">Neuer Zugang</div>
+                <h2>Mitarbeiter anlegen</h2>
+                <p>Persönliche Daten, Rolle und lokale Zeitzone festlegen.</p>
+            </div>
+            <button type="button" class="icon-button" data-bs-toggle="collapse" data-bs-target="#newEmployee" aria-label="Formular schließen">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
         </div>
-    </div>
+        <form id="formEmployee" class="row g-3">
+            <div class="col-lg-4 col-md-6">
+                <label class="form-label" for="employeeName">Name</label>
+                <input class="form-control" id="employeeName" name="name" required maxlength="100" autocomplete="name" placeholder="Vor- und Nachname">
+            </div>
+            <div class="col-lg-4 col-md-6">
+                <label class="form-label" for="employeeEmail">E-Mail</label>
+                <input class="form-control" id="employeeEmail" name="email" type="email" required autocomplete="email" placeholder="name@unternehmen.de">
+            </div>
+            <div class="col-lg-4 col-md-6">
+                <label class="form-label" for="employeePassword">Passwort</label>
+                <input class="form-control" id="employeePassword" name="password" type="password" minlength="6" required autocomplete="new-password" placeholder="Mindestens 6 Zeichen">
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label" for="employeeRole">Rolle</label>
+                <select class="form-select" id="employeeRole" name="role">
+                    <option value="employee">Mitarbeiter</option>
+                    <option value="admin">Administration</option>
+                </select>
+            </div>
+            <div class="col-lg-4 col-md-6">
+                <label class="form-label" for="employeeTimezone">Zeitzone</label>
+                <select class="form-select" id="employeeTimezone" name="timezone" required>
+                    <?php foreach ($timezoneOptions as $group => $options): ?>
+                        <optgroup label="<?= h($group) ?>">
+                            <?php foreach ($options as $option): ?>
+                                <option value="<?= h($option['value']) ?>" <?= $option['value'] === 'Europe/Berlin' ? 'selected' : '' ?>><?= h($option['label']) ?></option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label" for="employeeLocation">Standort</label>
+                <div class="input-with-icon">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+                    <input class="form-control" id="employeeLocation" value="Kaufbeuren, Bayern" disabled>
+                </div>
+            </div>
+            <div class="col-lg-2 d-flex align-items-end">
+                <button class="btn btn-brand w-100" type="submit">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+                    Speichern
+                </button>
+            </div>
+        </form>
+    </section>
 </div>
 
-<div class="card shadow-sm">
+<section class="surface-card employee-list-card">
+    <div class="section-heading table-heading">
+        <div>
+            <div class="eyebrow">Live-Übersicht</div>
+            <h2>Teamstatus</h2>
+            <p>Die Arbeitszeiten werden automatisch jede Sekunde aktualisiert.</p>
+        </div>
+        <label class="search-field" for="employeeSearch">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+            <input id="employeeSearch" type="search" placeholder="Mitarbeiter suchen" autocomplete="off">
+        </label>
+    </div>
     <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" id="employeeTable">
+        <table class="table employee-table align-middle mb-0" id="employeeTable">
             <thead>
             <tr>
-                <th>Name</th>
+                <th>Mitarbeiter</th>
                 <th>Status</th>
-                <th>Heute</th>
-                <th></th>
+                <th>Arbeitszeit heute</th>
+                <th class="text-end">Aktion</th>
             </tr>
             </thead>
             <tbody>
             <?php foreach ($employees as $employee): ?>
-                <?php $id = (int)$employee['id']; ?>
-                <tr data-employee-id="<?= $id ?>">
+                <?php
+                $id = (int)$employee['id'];
+                $parts = preg_split('/\s+/', trim((string)$employee['name'])) ?: [];
+                $initials = '';
+                foreach ($parts as $part) {
+                    if ($part === '') continue;
+                    $initials .= strtoupper(substr($part, 0, 1));
+                    if (strlen($initials) >= 2) break;
+                }
+                ?>
+                <tr data-employee-id="<?= $id ?>" data-search="<?= h(strtolower($employee['name'] . ' ' . $employee['email'])) ?>">
                     <td>
-                        <div class="fw-semibold"><?= h($employee['name']) ?></div>
-                        <div class="small text-secondary"><?= h($employee['email']) ?></div>
-                    </td>
-                    <td class="status-cell"><?= $this->renderStatusBadge($statuses[$id]) ?></td>
-                    <td class="today-cell"><?= h(seconds_to_hhmmss($totals[$id]['net_seconds'])) ?></td>
-                    <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="<?= h(url('/employee?id=' . $id)) ?>">Details</a></td>
-                </tr>
-            <?php endforeach; ?>
-            <?php if (!$employees): ?>
-                <tr><td colspan="4" class="text-center py-5 text-secondary">Keine Mitarbeiter vorhanden.</td></tr>
-            <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-<div class="small text-secondary mt-2">Die Zeiten laufen jede Sekunde weiter.</div>
-
-<div class="modal fade" id="weekReportModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
-        <form class="modal-content" method="post" action="<?= h(url('/reports/week.pdf')) ?>" target="_blank" id="weekReportForm">
-            <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
-            <div class="modal-header week-report-header">
-                <div class="me-auto">
-                    <h2 class="modal-title fs-5">Wochenzettel drucken</h2>
-                    <div class="small text-secondary">KW <?= h(sprintf('%02d', $week['week'])) ?> · <?= h($week['start_label']) ?> bis <?= h($week['end_label']) ?></div>
-                </div>
-                <button type="submit" class="btn btn-primary week-report-print">PDF öffnen</button>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Schließen"></button>
-            </div>
-            <div class="modal-body">
-                <div class="form-check report-check mb-3">
-                    <input class="form-check-input" type="checkbox" id="selectAllEmployees" checked>
-                    <label class="form-check-label fw-semibold" for="selectAllEmployees">Alle auswählen</label>
-                </div>
-                <div class="report-employee-list">
-                    <?php foreach ($employees as $employee): ?>
-                        <?php if (!(int)$employee['active']) continue; ?>
-                        <label class="report-employee-item">
-                            <input class="form-check-input report-employee-checkbox" type="checkbox" name="employee_ids[]" value="<?= (int)$employee['id'] ?>" checked>
+                        <div class="employee-identity">
+                            <span class="employee-avatar" aria-hidden="true"><?= h($initials ?: 'M') ?></span>
                             <span>
                                 <strong><?= h($employee['name']) ?></strong>
                                 <small><?= h($employee['email']) ?></small>
                             </span>
+                        </div>
+                    </td>
+                    <td class="status-cell"><?= $this->renderStatusBadge($statuses[$id]) ?></td>
+                    <td><span class="today-cell time-value"><?= h(seconds_to_hhmmss($totals[$id]['net_seconds'])) ?></span></td>
+                    <td class="text-end">
+                        <a class="btn btn-table-action" href="<?= h(url('/employee?id=' . $id)) ?>">
+                            Details
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                        </a>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            <?php if (!$employees): ?>
+                <tr><td colspan="4" class="empty-state"><span>Keine Mitarbeiter vorhanden.</span></td></tr>
+            <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    <div class="table-empty-filter" id="employeeSearchEmpty" hidden>Keine passenden Mitarbeiter gefunden.</div>
+</section>
+
+<div class="modal fade" id="weekReportModal" tabindex="-1" aria-labelledby="weekReportTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+        <form class="modal-content" method="post" action="<?= h(url('/reports/week.pdf')) ?>" target="_blank" id="weekReportForm">
+            <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
+            <div class="modal-header week-report-header">
+                <div class="modal-title-group me-auto">
+                    <div class="eyebrow">KW <?= h(sprintf('%02d', $week['week'])) ?></div>
+                    <h2 class="modal-title" id="weekReportTitle">Wochenzettel drucken</h2>
+                    <p><?= h($week['start_label']) ?> bis <?= h($week['end_label']) ?></p>
+                </div>
+                <button type="submit" class="btn btn-brand week-report-print">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>
+                    PDF öffnen
+                </button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body">
+                <div class="report-toolbar">
+                    <label class="search-field flex-grow-1" for="reportEmployeeSearch">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+                        <input id="reportEmployeeSearch" type="search" placeholder="Liste durchsuchen" autocomplete="off">
+                    </label>
+                    <span class="selection-count" id="reportSelectionCount"></span>
+                </div>
+                <label class="report-select-all">
+                    <input class="form-check-input" type="checkbox" id="selectAllEmployees" checked>
+                    <span>
+                        <strong>Alle Mitarbeiter auswählen</strong>
+                        <small>Für jede Auswahl wird eine eigene PDF-Seite erstellt.</small>
+                    </span>
+                </label>
+                <div class="report-employee-list" id="reportEmployeeList">
+                    <?php foreach ($employees as $employee): ?>
+                        <?php if (!(int)$employee['active']) continue; ?>
+                        <label class="report-employee-item" data-search="<?= h(strtolower($employee['name'] . ' ' . $employee['email'])) ?>">
+                            <input class="form-check-input report-employee-checkbox" type="checkbox" name="employee_ids[]" value="<?= (int)$employee['id'] ?>" checked>
+                            <span class="report-avatar" aria-hidden="true"><?= h(strtoupper(substr((string)$employee['name'], 0, 1))) ?></span>
+                            <span class="report-person">
+                                <strong><?= h($employee['name']) ?></strong>
+                                <small><?= h($employee['email']) ?></small>
+                            </span>
+                            <svg class="check-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
                         </label>
                     <?php endforeach; ?>
                 </div>
-                <div class="small text-secondary mt-3">Die Liste kann vollständig gescrollt werden. Für jeden ausgewählten Mitarbeiter wird eine eigene PDF-Seite mit Unterschriftsfeld erstellt.</div>
+                <div class="report-empty" id="reportSearchEmpty" hidden>Keine passenden Mitarbeiter gefunden.</div>
             </div>
         </form>
     </div>

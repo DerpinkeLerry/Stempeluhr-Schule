@@ -32,3 +32,24 @@ php tests/TimeClockServiceTest.php
 ```
 
 Für den zweiten Test muss `PDO_SQLite` aktiviert sein, wie auch für den normalen Betrieb der Anwendung.
+
+## Wepro-Redesign
+
+Die gesamte Benutzeroberfläche wurde visuell neu aufgebaut und an die öffentlich sichtbare Gestaltung der Wepro GmbH in Kaufbeuren angelehnt.
+
+- konsistente Wepro-Farbwelt aus tiefem Marineblau, warmem Orange, Weiß und hellen Grautönen
+- neue Wepro-Wortmarke mit Produktbezeichnung „Zeiterfassung“
+- vollständig überarbeitete Navigation mit responsivem Mobilmenü
+- neue Dashboard-Kennzahlen und verbesserte Mitarbeiterübersicht
+- Live-Suche in der Mitarbeiterliste
+- neu gestaltete persönliche Stempeluhr mit großen Zeitwerten und klaren Aktionen
+- hochwertig überarbeitete Mitarbeiterdetails, Abwesenheiten und Feiertagsansicht
+- neu gestalteter Login als zweigeteilte Marken- und Anmeldefläche
+- überarbeitete Modale, Formulare, Tabellen, Statusanzeigen und Rückmeldungen
+- dezente Animationen für Seitenaufbau, Status, Schaltflächen, Karten und Dialoge
+- Berücksichtigung von `prefers-reduced-motion` für barriereärmere Nutzung
+- optimierte Darstellung für Desktop, Tablet und Smartphone
+- Mitarbeiter- und Wochenzettelsuche sowie Auswahlzähler im Druckdialog
+- nicht blockierende Toast-Hinweise statt einfacher Browser-Warnfenster bei den meisten Aktionen
+
+Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.

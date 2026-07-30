@@ -1,6 +1,12 @@
-# Stempeluhr
+# Wepro Zeiterfassung
 
-Kleine Stempeluhr mit PHP und SQLite.
+Moderne Arbeitszeiterfassung mit PHP und SQLite im visuellen Stil der Wepro GmbH.
+
+## Design
+
+Die Oberfläche wurde vollständig neu gestaltet. Sie verwendet eine Wepro-inspirierte Markenwelt mit Marineblau, warmem Orange, großzügiger Typografie, feinen Liniengrafiken und zurückhaltenden Animationen. Alle Hauptansichten sind responsiv und für Desktop, Tablet und Smartphone optimiert.
+
+Für die Darstellung werden Bootstrap 5.3 und Montserrat über CDN geladen. Ohne Internetverbindung greift die Schrift automatisch auf installierte Systemschriften zurück; die Kernfunktionen der Anwendung bleiben davon unberührt.
 
 ## Funktionen
 
