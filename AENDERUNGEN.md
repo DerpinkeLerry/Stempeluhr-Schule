@@ -24,6 +24,12 @@
    - Beim Anlegen eines Mitarbeiters steht jetzt ein Dropdown mit gültigen IANA-Zeitzonen zur Verfügung.
    - `Europe/Berlin` ist vorausgewählt.
 
+6. **Dynamische Restpause**
+   - Während einer laufenden Pause erscheint unter der Pausenzeit eine live herunterzählende Restpause.
+   - Der Pausenanspruch beträgt grundsätzlich 30 Minuten.
+   - Bei Arbeitsbeginn vor 08:00 Uhr wird die Zeit bis 08:00 Uhr zusätzlich gutgeschrieben, zum Beispiel 40 Minuten bei Arbeitsbeginn um 07:50 Uhr.
+   - Die Pausenanzeige bewegt sich beim Starten und Beenden einer Pause dezent und flüssig.
+
 ## Prüfungen
 
 ```bash

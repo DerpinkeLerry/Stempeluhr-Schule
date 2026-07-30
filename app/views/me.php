@@ -8,7 +8,7 @@ foreach ($parts as $part) {
     if (strlen($initials) >= 2) break;
 }
 ?>
-<div id="meRoot" data-employee-id="<?= (int)$employee['id'] ?>">
+<div id="meRoot" data-employee-id="<?= (int)$employee['id'] ?>"<?= (($status['status'] ?? '') === 'ON_BREAK') ? ' class="on-break"' : '' ?>>
     <section class="page-hero personal-hero">
         <div class="personal-heading">
             <span class="employee-avatar employee-avatar-lg" aria-hidden="true"><?= h($initials ?: 'M') ?></span>
@@ -42,10 +42,16 @@ foreach ($parts as $part) {
                         <strong id="meTotals" class="time-display"><?= h(seconds_to_hhmmss($totals['net_seconds'])) ?></strong>
                         <small>Nettozeit ohne Pausen</small>
                     </article>
-                    <article class="clock-metric">
-                        <span class="metric-label">Pausenzeit</span>
-                        <strong id="meBreakTotal" class="time-display time-display-secondary"><?= h(seconds_to_hhmmss($totals['break_seconds'])) ?></strong>
-                        <small>Heute erfasste Pausen</small>
+                    <article class="clock-metric clock-metric-break">
+                        <div class="break-metric-current">
+                            <span class="metric-label">Pausenzeit</span>
+                            <strong id="meBreakTotal" class="time-display time-display-secondary"><?= h(seconds_to_hhmmss($totals['break_seconds'])) ?></strong>
+                            <small>Heute erfasste Pausen</small>
+                        </div>
+                        <div id="meBreakRest" class="break-rest" aria-live="polite" aria-hidden="<?= (($status['status'] ?? '') === 'ON_BREAK') ? 'false' : 'true' ?>">
+                            <span class="break-rest-label">Restpause</span>
+                            <strong id="meBreakRemaining" class="break-rest-value"><?= h(seconds_to_hhmmss($totals['break_remaining_seconds'] ?? 1800)) ?></strong>
+                        </div>
                     </article>
                 </div>
 

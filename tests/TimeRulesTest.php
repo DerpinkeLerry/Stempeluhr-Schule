@@ -29,6 +29,19 @@ assertRule(
     'Nettoarbeitszeit darf nicht negativ werden'
 );
 
+assertRule(
+    TimeClockService::calculateBreakAllowanceSeconds(new DateTimeImmutable('2026-07-30 07:50:00', $berlin)) === 2400,
+    'Arbeitsbeginn um 07:50 Uhr muss 40 Minuten Pause ergeben'
+);
+assertRule(
+    TimeClockService::calculateBreakAllowanceSeconds(new DateTimeImmutable('2026-07-30 08:00:00', $berlin)) === 1800,
+    'Arbeitsbeginn um 08:00 Uhr muss 30 Minuten Pause ergeben'
+);
+assertRule(
+    TimeClockService::calculateBreakAllowanceSeconds(new DateTimeImmutable('2026-07-30 07:30:00', $berlin)) === 3600,
+    'Arbeitsbeginn um 07:30 Uhr muss 60 Minuten Pause ergeben'
+);
+
 $mondayStart = new DateTimeImmutable('2026-07-27 07:30:00', $berlin);
 $mondayEnd = TimeClockService::forgottenSessionEndLocal($mondayStart);
 assertRule($mondayEnd->format('Y-m-d H:i:s') === '2026-07-27 17:00:00', 'Montag muss auf 17:00 Uhr korrigiert werden');

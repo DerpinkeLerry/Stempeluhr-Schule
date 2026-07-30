@@ -152,6 +152,11 @@
         return Number(state.totals?.break_seconds || 0) + extra;
     }
 
+    function liveBreakRemainingSeconds(state) {
+        const allowance = Number(state.totals?.break_allowance_seconds || 1800);
+        return Math.max(0, allowance - liveBreakSeconds(state));
+    }
+
     function breaksHtml(state) {
         const breaks = state?.breaks || [];
         if (!breaks.length) {
@@ -225,9 +230,11 @@
         if (!meState) return;
         const total = document.getElementById('meTotals');
         const breakTotal = document.getElementById('meBreakTotal');
+        const breakRemaining = document.getElementById('meBreakRemaining');
         const breaks = document.getElementById('meBreaks');
         if (total) total.textContent = secondsToTime(liveNetSeconds(meState));
         if (breakTotal) breakTotal.textContent = secondsToTime(liveBreakSeconds(meState));
+        if (breakRemaining) breakRemaining.textContent = secondsToTime(liveBreakRemainingSeconds(meState));
         if (breaks) breaks.innerHTML = breaksHtml(meState);
     }
 
@@ -242,9 +249,12 @@
             meState = {...result, syncedAt: Date.now()};
             const status = document.getElementById('meStatus');
             const actions = document.getElementById('meActions');
+            const breakRest = document.getElementById('meBreakRest');
+            const isOnBreak = result.status.status === 'ON_BREAK';
             if (status) status.innerHTML = statusHtml(result.status, true);
             if (actions) actions.innerHTML = actionHtml(root.dataset.employeeId, result.status);
-            root.classList.toggle('on-break', result.status.status === 'ON_BREAK');
+            if (breakRest) breakRest.setAttribute('aria-hidden', isOnBreak ? 'false' : 'true');
+            root.classList.toggle('on-break', isOnBreak);
             tickMe();
         } catch (_) {
             // Bestehende Anzeige beibehalten.

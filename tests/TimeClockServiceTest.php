@@ -85,6 +85,19 @@ $tests['Pausen werden von der Arbeitszeit abgezogen'] = static function (): void
     assertSameValue(5400, $totals['net_seconds'], 'Arbeitszeit muss während der Pause stehen bleiben');
 };
 
+$tests['Restpause berücksichtigt frühen Arbeitsbeginn'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-30 05:50:00'); // 07:50
+    $service->startWork($employeeId);
+    $clock = new DateTimeImmutable('2026-07-30 06:10:00', new DateTimeZone('UTC')); // 08:10
+    $service->startBreak($employeeId);
+    $clock = new DateTimeImmutable('2026-07-30 06:20:00', new DateTimeZone('UTC')); // 08:20
+
+    $totals = $service->getTodayTotals($employeeId);
+    assertSameValue(2400, $totals['break_allowance_seconds'], '07:50 Uhr muss 40 Minuten Pausenanspruch ergeben');
+    assertSameValue(600, $totals['break_seconds'], 'Die laufende Pause muss berücksichtigt werden');
+    assertSameValue(1800, $totals['break_remaining_seconds'], 'Nach zehn Minuten müssen 30 Minuten Restpause bleiben');
+};
+
 $tests['Vergessener Feierabend Montag wird auf 17:00 gesetzt'] = static function (): void {
     [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-28 06:00:00'); // Dienstag 08:00
     $pdo->prepare('INSERT INTO work_session(employee_id, started_at, source) VALUES(?,?,?)')

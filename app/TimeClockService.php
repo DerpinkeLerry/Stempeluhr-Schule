@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 final class TimeClockService
 {
+    private const BASE_BREAK_SECONDS = 30 * 60;
+
     private $clock;
 
     public function __construct(private PDO $pdo, ?callable $clock = null)
@@ -55,6 +57,13 @@ final class TimeClockService
     public static function calculateNetSeconds(int $grossSeconds, int $breakSeconds): int
     {
         return max(0, $grossSeconds - $breakSeconds);
+    }
+
+    public static function calculateBreakAllowanceSeconds(DateTimeImmutable $localWorkStart): int
+    {
+        $eightOClock = $localWorkStart->setTime(8, 0, 0);
+        $earlyStartBonus = max(0, $eightOClock->getTimestamp() - $localWorkStart->getTimestamp());
+        return self::BASE_BREAK_SECONDS + $earlyStartBonus;
     }
 
     public static function forgottenSessionEndLocal(DateTimeImmutable $started): DateTimeImmutable
@@ -301,7 +310,14 @@ final class TimeClockService
     {
         $employee = $this->getEmployee($employeeId);
         if (!$employee) {
-            return ['gross_seconds' => 0, 'break_seconds' => 0, 'net_seconds' => 0];
+            return [
+                'gross_seconds' => 0,
+                'break_seconds' => 0,
+                'net_seconds' => 0,
+                'break_allowance_seconds' => self::BASE_BREAK_SECONDS,
+                'break_bonus_seconds' => 0,
+                'break_remaining_seconds' => self::BASE_BREAK_SECONDS,
+            ];
         }
 
         [$start, $end] = $this->dayRangeUtc($employee['timezone']);
@@ -312,7 +328,11 @@ final class TimeClockService
 
         $gross = 0;
         $breakSeconds = 0;
+        $firstTodayStart = null;
         foreach ($sessions as $session) {
+            if ($firstTodayStart === null && $session['started_at'] >= $start && $session['started_at'] < $end) {
+                $firstTodayStart = (string)$session['started_at'];
+            }
             $sessionEnd = $this->effectiveSessionEndUtc($session, $employee['timezone'], $now);
             $gross += $this->overlapSeconds($session['started_at'], $sessionEnd, $start, $end);
 
@@ -327,10 +347,19 @@ final class TimeClockService
             }
         }
 
+        $breakAllowanceSeconds = self::BASE_BREAK_SECONDS;
+        if ($firstTodayStart !== null) {
+            $localWorkStart = $this->parseUtc($firstTodayStart)->setTimezone(new DateTimeZone($employee['timezone']));
+            $breakAllowanceSeconds = self::calculateBreakAllowanceSeconds($localWorkStart);
+        }
+
         return [
             'gross_seconds' => $gross,
             'break_seconds' => $breakSeconds,
             'net_seconds' => self::calculateNetSeconds($gross, $breakSeconds),
+            'break_allowance_seconds' => $breakAllowanceSeconds,
+            'break_bonus_seconds' => max(0, $breakAllowanceSeconds - self::BASE_BREAK_SECONDS),
+            'break_remaining_seconds' => max(0, $breakAllowanceSeconds - $breakSeconds),
         ];
     }
 
