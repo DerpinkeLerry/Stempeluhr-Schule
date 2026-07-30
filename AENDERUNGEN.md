@@ -53,3 +53,11 @@ Die gesamte Benutzeroberfläche wurde visuell neu aufgebaut und an die öffentli
 - nicht blockierende Toast-Hinweise statt einfacher Browser-Warnfenster bei den meisten Aktionen
 
 Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.
+
+
+## Korrektur: nicht anklickbarer Wochenzettel-Dialog
+
+- Ursache behoben: Die Seiten-Eingangsanimation behielt einen CSS-`transform` bei und erzeugte dadurch einen eigenen Stapelkontext. Der Bootstrap-Hintergrund lag deshalb über dem Dialog und blockierte alle Klicks.
+- Modale werden nun zuverlässig direkt unter `body` platziert.
+- Explizite Ebenen für Dialog und Hintergrund ergänzen zusätzliche Sicherheit.
+- Der Wochenzettel-Dialog bleibt vollständig anklickbar, scrollbar und über die Schließen-Schaltfläche bedienbar.
