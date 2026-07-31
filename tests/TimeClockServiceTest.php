@@ -140,6 +140,36 @@ $tests['Restpause berücksichtigt frühen Arbeitsbeginn'] = static function (): 
     assertSameValue(1800, $totals['break_remaining_seconds'], 'Nach zehn Minuten müssen 30 Minuten Restpause bleiben');
 };
 
+$tests['Freitag hat ohne Einstempelung keine Grundpause'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-31 05:45:00'); // Freitag 07:45
+
+    $totals = $service->getTodayTotals($employeeId);
+    assertSameValue(0, $totals['break_allowance_seconds'], 'Freitags darf ohne Einstempelung keine Grundpause angezeigt werden');
+    assertSameValue(0, $totals['break_remaining_seconds'], 'Freitags darf ohne Einstempelung keine Restpause angezeigt werden');
+};
+
+$tests['Freitag hat ab 08:00 keine Pausengutschrift'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-31 06:00:00'); // Freitag 08:00
+    $service->startWork($employeeId);
+
+    $totals = $service->getTodayTotals($employeeId);
+    assertSameValue(0, $totals['break_allowance_seconds'], 'Freitags darf ab 08:00 Uhr keine Pause gutgeschrieben werden');
+    assertSameValue(0, $totals['break_remaining_seconds'], 'Freitags darf ab 08:00 Uhr keine Restpause bestehen');
+};
+
+$tests['Freitag schreibt nur die Zeit vor 08:00 als Pause gut'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-31 05:50:00'); // Freitag 07:50
+    $service->startWork($employeeId);
+    $clock = new DateTimeImmutable('2026-07-31 06:00:00', new DateTimeZone('UTC')); // 08:00
+    $service->startBreak($employeeId);
+    $clock = new DateTimeImmutable('2026-07-31 06:05:00', new DateTimeZone('UTC')); // 08:05
+
+    $totals = $service->getTodayTotals($employeeId);
+    assertSameValue(600, $totals['break_allowance_seconds'], 'Freitags müssen bei Arbeitsbeginn um 07:50 Uhr genau zehn Minuten gutgeschrieben werden');
+    assertSameValue(300, $totals['break_seconds'], 'Die laufende Freitagspause muss berücksichtigt werden');
+    assertSameValue(300, $totals['break_remaining_seconds'], 'Nach fünf Minuten müssen noch fünf Minuten Freitagsgutschrift übrig sein');
+};
+
 $tests['Vergessener Feierabend Montag wird auf 17:00 gesetzt'] = static function (): void {
     [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-28 06:00:00'); // Dienstag 08:00
     $pdo->prepare('INSERT INTO work_session(employee_id, started_at, source) VALUES(?,?,?)')

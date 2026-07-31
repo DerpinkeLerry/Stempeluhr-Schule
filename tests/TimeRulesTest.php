@@ -41,6 +41,18 @@ assertRule(
     TimeClockService::calculateBreakAllowanceSeconds(new DateTimeImmutable('2026-07-30 07:30:00', $berlin)) === 3600,
     'Arbeitsbeginn um 07:30 Uhr muss 60 Minuten Pause ergeben'
 );
+assertRule(
+    TimeClockService::calculateBreakAllowanceSeconds(new DateTimeImmutable('2026-07-31 08:00:00', $berlin)) === 0,
+    'Freitags darf es ab 08:00 Uhr keine Pausengutschrift geben'
+);
+assertRule(
+    TimeClockService::calculateBreakAllowanceSeconds(new DateTimeImmutable('2026-07-31 07:50:00', $berlin)) === 600,
+    'Freitags darf bei Arbeitsbeginn um 07:50 Uhr nur die Frühzeit von zehn Minuten gutgeschrieben werden'
+);
+assertRule(
+    TimeClockService::calculateBreakAllowanceSeconds(new DateTimeImmutable('2026-07-31 07:30:00', $berlin)) === 1800,
+    'Freitags darf bei Arbeitsbeginn um 07:30 Uhr nur die Frühzeit von 30 Minuten gutgeschrieben werden'
+);
 
 assertRule(
     TimeClockService::calculateAbsenceCreditSeconds(1) === 8 * 3600 + 30 * 60,

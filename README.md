@@ -13,7 +13,7 @@ Für die Darstellung werden Bootstrap 5.3 und Montserrat über CDN geladen. Ohne
 - Login für Admin und Mitarbeiter
 - Arbeitsbeginn und Feierabend
 - Pausen starten und beenden; während einer Pause steht die Arbeitszeit
-- 30 Minuten Grundpause plus Zeitgutschrift bei Arbeitsbeginn vor 08:00 Uhr; die Restpause wird während einer laufenden Pause live angezeigt
+- An allen Tagen außer Freitag 30 Minuten Grundpause plus Zeitgutschrift bei Arbeitsbeginn vor 08:00 Uhr; freitags nur die Zeit vor 08:00 Uhr und sonst 0 Minuten Pause
 - Arbeitsbeginn frühestens ab 07:30 Uhr
 - Vergessener Feierabend wird am Folgetag mit Warnung korrigiert: 17:00 Uhr, freitags 12:00 Uhr
 - Mitarbeiter mit Zeitzonen-Auswahl anlegen

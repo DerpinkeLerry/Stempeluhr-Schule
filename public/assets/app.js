@@ -157,7 +157,7 @@
     }
 
     function liveBreakRemainingSeconds(state) {
-        const allowance = Number(state.totals?.break_allowance_seconds || 1800);
+        const allowance = Number(state.totals?.break_allowance_seconds ?? 1800);
         return Math.max(0, allowance - liveBreakSeconds(state));
     }
 

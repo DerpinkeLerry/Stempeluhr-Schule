@@ -63,6 +63,11 @@ final class TimeClockService
     {
         $eightOClock = $localWorkStart->setTime(8, 0, 0);
         $earlyStartBonus = max(0, $eightOClock->getTimestamp() - $localWorkStart->getTimestamp());
+
+        if ((int)$localWorkStart->format('N') === 5) {
+            return $earlyStartBonus;
+        }
+
         return self::BASE_BREAK_SECONDS + $earlyStartBonus;
     }
 
@@ -477,7 +482,8 @@ final class TimeClockService
             }
         }
 
-        $breakAllowanceSeconds = self::BASE_BREAK_SECONDS;
+        $localNow = $this->now()->setTimezone(new DateTimeZone($employee['timezone']));
+        $breakAllowanceSeconds = (int)$localNow->format('N') === 5 ? 0 : self::BASE_BREAK_SECONDS;
         if ($firstTodayStart !== null) {
             $localWorkStart = $this->parseUtc($firstTodayStart)->setTimezone(new DateTimeZone($employee['timezone']));
             $breakAllowanceSeconds = self::calculateBreakAllowanceSeconds($localWorkStart);

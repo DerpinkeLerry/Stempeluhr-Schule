@@ -26,8 +26,9 @@
 
 6. **Dynamische Restpause**
    - Während einer laufenden Pause erscheint unter der Pausenzeit eine live herunterzählende Restpause.
-   - Der Pausenanspruch beträgt grundsätzlich 30 Minuten.
+   - An allen Tagen außer Freitag beträgt der Pausenanspruch grundsätzlich 30 Minuten.
    - Bei Arbeitsbeginn vor 08:00 Uhr wird die Zeit bis 08:00 Uhr zusätzlich gutgeschrieben, zum Beispiel 40 Minuten bei Arbeitsbeginn um 07:50 Uhr.
+   - Freitags beträgt der Pausenanspruch grundsätzlich 0 Minuten; bei Arbeitsbeginn vor 08:00 Uhr wird ausschließlich die Zeit bis 08:00 Uhr gutgeschrieben.
    - Die Pausenanzeige bewegt sich beim Starten und Beenden einer Pause dezent und flüssig.
 
 7. **Mitarbeiter bearbeiten und löschen**
