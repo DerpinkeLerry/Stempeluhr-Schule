@@ -495,7 +495,7 @@ final class TimeClockService
             'net_seconds' => self::calculateNetSeconds($gross, $breakSeconds),
             'break_allowance_seconds' => $breakAllowanceSeconds,
             'break_bonus_seconds' => max(0, $breakAllowanceSeconds - self::BASE_BREAK_SECONDS),
-            'break_remaining_seconds' => max(0, $breakAllowanceSeconds - $breakSeconds),
+            'break_remaining_seconds' => $breakAllowanceSeconds - $breakSeconds,
         ];
     }
 

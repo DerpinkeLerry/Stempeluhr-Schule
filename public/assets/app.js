@@ -56,6 +56,12 @@
         return [hours, minutes, rest].map(number => String(number).padStart(2, '0')).join(':');
     }
 
+    function signedSecondsToTime(seconds) {
+        seconds = Number.parseInt(seconds, 10) || 0;
+        const sign = seconds < 0 ? '-' : '';
+        return sign + secondsToTime(Math.abs(seconds));
+    }
+
     function showToast(message, type = 'info') {
         const container = document.getElementById('appToastContainer');
         if (!container || !window.bootstrap?.Toast) {
@@ -158,7 +164,7 @@
 
     function liveBreakRemainingSeconds(state) {
         const allowance = Number(state.totals?.break_allowance_seconds ?? 1800);
-        return Math.max(0, allowance - liveBreakSeconds(state));
+        return allowance - liveBreakSeconds(state);
     }
 
     function breaksHtml(state) {
@@ -238,7 +244,7 @@
         const breaks = document.getElementById('meBreaks');
         if (total) total.textContent = secondsToTime(liveNetSeconds(meState));
         if (breakTotal) breakTotal.textContent = secondsToTime(liveBreakSeconds(meState));
-        if (breakRemaining) breakRemaining.textContent = secondsToTime(liveBreakRemainingSeconds(meState));
+        if (breakRemaining) breakRemaining.textContent = signedSecondsToTime(liveBreakRemainingSeconds(meState));
         if (breaks) breaks.innerHTML = breaksHtml(meState);
     }
 

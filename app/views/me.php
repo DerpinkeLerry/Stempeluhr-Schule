@@ -50,7 +50,7 @@ foreach ($parts as $part) {
                         </div>
                         <div id="meBreakRest" class="break-rest" aria-live="polite" aria-hidden="<?= (($status['status'] ?? '') === 'ON_BREAK') ? 'false' : 'true' ?>">
                             <span class="break-rest-label">Restpause</span>
-                            <strong id="meBreakRemaining" class="break-rest-value"><?= h(seconds_to_hhmmss($totals['break_remaining_seconds'] ?? 1800)) ?></strong>
+                            <strong id="meBreakRemaining" class="break-rest-value"><?= h(signed_seconds_to_hhmmss($totals['break_remaining_seconds'] ?? 1800)) ?></strong>
                         </div>
                     </article>
                 </div>

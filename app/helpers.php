@@ -132,6 +132,13 @@ function seconds_to_hhmmss(int $seconds): string
     return sprintf('%02d:%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60), $seconds % 60);
 }
 
+function signed_seconds_to_hhmmss(int $seconds): string
+{
+    $sign = $seconds < 0 ? '-' : '';
+    $seconds = abs($seconds);
+    return $sign . sprintf('%02d:%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60), $seconds % 60);
+}
+
 function utc_to_local(?string $utc, string $timezone, string $format = 'd.m.Y H:i'): string
 {
     if (!$utc) {
