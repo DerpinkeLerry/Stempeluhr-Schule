@@ -42,6 +42,37 @@ assertRule(
     'Arbeitsbeginn um 07:30 Uhr muss 60 Minuten Pause ergeben'
 );
 
+assertRule(
+    TimeClockService::calculateAbsenceCreditSeconds(1) === 8 * 3600 + 30 * 60,
+    'Abwesenheit muss montags mit 8:30 Stunden angerechnet werden'
+);
+assertRule(
+    TimeClockService::calculateAbsenceCreditSeconds(5) === 4 * 3600,
+    'Abwesenheit muss freitags mit 4:00 Stunden angerechnet werden'
+);
+assertRule(
+    TimeClockService::calculateAbsenceCreditSeconds(6) === 0,
+    'Abwesenheit darf samstags nicht automatisch angerechnet werden'
+);
+
+$middleRanges = TimeClockService::absenceRangesAfterWorkedDay('2026-07-27', '2026-07-31', '2026-07-30');
+assertRule(
+    $middleRanges === [
+        ['start_date' => '2026-07-27', 'end_date' => '2026-07-29'],
+        ['start_date' => '2026-07-31', 'end_date' => '2026-07-31'],
+    ],
+    'Ein Arbeitstag mitten in einer Abwesenheit muss den Zeitraum korrekt teilen'
+);
+
+$firstDayRanges = TimeClockService::absenceRangesAfterWorkedDay('2026-07-27', '2026-07-31', '2026-07-27');
+assertRule(
+    $firstDayRanges === [['start_date' => '2026-07-28', 'end_date' => '2026-07-31']],
+    'Der erste Arbeitstag muss aus der Abwesenheit entfernt werden'
+);
+
+$onlyDayRanges = TimeClockService::absenceRangesAfterWorkedDay('2026-07-30', '2026-07-30', '2026-07-30');
+assertRule($onlyDayRanges === [], 'Eine eintägige Abwesenheit muss beim Einstempeln vollständig entfallen');
+
 $mondayStart = new DateTimeImmutable('2026-07-27 07:30:00', $berlin);
 $mondayEnd = TimeClockService::forgottenSessionEndLocal($mondayStart);
 assertRule($mondayEnd->format('Y-m-d H:i:s') === '2026-07-27 17:00:00', 'Montag muss auf 17:00 Uhr korrigiert werden');

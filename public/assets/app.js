@@ -112,11 +112,15 @@
     }
 
     function actionHtml(employeeId, status) {
-        if (status?.status === 'NOT_PRESENT' || status?.status === 'HOLIDAY') {
+        const startableStatuses = ['NOT_PRESENT', 'HOLIDAY', 'VACATION', 'SICK', 'SCHOOL', 'OTHER'];
+        if (startableStatuses.includes(status?.status)) {
             if (status?.work_start_allowed === false) {
                 return actionButton(employeeId, 'work_start', 'Arbeitsbeginn ab 07:30 Uhr', 'btn-outline-success', true);
             }
-            return actionButton(employeeId, 'work_start', 'Arbeitsbeginn', 'btn-success');
+            const text = ['VACATION', 'SICK', 'SCHOOL', 'OTHER'].includes(status?.status)
+                ? 'Trotz Abwesenheit einstempeln'
+                : 'Arbeitsbeginn';
+            return actionButton(employeeId, 'work_start', text, 'btn-success');
         }
         if (status?.status === 'WORKING') {
             if (status?.stale_session) {
@@ -129,7 +133,7 @@
             return actionButton(employeeId, 'break_end', 'Pause beenden', 'btn-outline-warning')
                 + actionButton(employeeId, 'work_end', 'Feierabend', 'btn-danger');
         }
-        return '<div class="clock-hint">Heute ist eine Abwesenheit eingetragen.</div>';
+        return '<div class="clock-hint">Diese Aktion ist derzeit nicht verfügbar.</div>';
     }
 
     function localTime(utc) {
@@ -293,6 +297,8 @@
             await refreshMe();
             if (result.warning) {
                 showToast(result.warning, 'warning');
+            } else if (result.absence_overridden) {
+                showToast('Arbeitszeit wurde gestartet. Die Abwesenheit für heute wurde entfernt.', 'success');
             } else {
                 const messages = {
                     work_start: 'Arbeitszeit wurde gestartet.',

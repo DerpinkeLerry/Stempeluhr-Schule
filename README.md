@@ -21,6 +21,7 @@ Für die Darstellung werden Bootstrap 5.3 und Montserrat über CDN geladen. Ohne
 - Mitarbeiter im Bearbeiten-Dialog inklusive zugehöriger Zeiten und Abwesenheiten löschen
 - Arbeitszeiten und Abwesenheiten anzeigen
 - Abwesenheiten eintragen, bearbeiten und löschen
+- Trotz eingetragener Abwesenheit einstempeln; der Arbeitstag überschreibt nur die Abwesenheit dieses Tages
 - Scrollbare Mitarbeiterauswahl für Wochenzettel mit fest erreichbarem PDF-Button
 - Wochenzettel für alle oder ausgewählte Mitarbeiter als PDF
 - Unterschriftsfeld auf jedem Wochenzettel
@@ -118,9 +119,11 @@ Imagick wird nicht gebraucht. Wenn beim Start eine Warnung zu `php_imagick.dll` 
 
 ## Wochenzettel und Abwesenheiten
 
-Im Wochenzettel werden keine Buchungsanzahlen angezeigt. Bei Urlaub oder Krankheit werden normale Werktage von Montag bis Freitag mit 8 Stunden 30 Minuten Arbeitszeit angerechnet. In der Bemerkung steht weiterhin Urlaub oder Krank. Samstage und Sonntage werden nicht automatisch angerechnet.
+Im Wochenzettel werden keine Buchungsanzahlen angezeigt. Bei Urlaub oder Krankheit werden Montag bis Donnerstag jeweils 8 Stunden 30 Minuten und freitags 4 Stunden Arbeitszeit angerechnet. In der Bemerkung steht weiterhin Urlaub oder Krank. Samstage und Sonntage werden nicht automatisch angerechnet.
 
 Im Wochenzettel sind Abwesenheiten farblich markiert: Krank hellgelb, Urlaub hellblau und Schule oder Sonstiges hellgrün. Normale Arbeitstage bleiben ohne Hintergrundfarbe.
+
+Wird an einem Abwesenheitstag eingestempelt, wird dieser Tag automatisch aus der Abwesenheit entfernt. Bei einem mehrtägigen Zeitraum bleiben die Tage davor und danach als getrennte Abwesenheiten erhalten.
 
 ## Tests
 

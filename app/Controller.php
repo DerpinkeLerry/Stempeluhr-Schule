@@ -55,11 +55,14 @@ final class Controller
                 . '<svg viewBox="0 0 24 24" aria-hidden="true">' . $icon . '</svg><span>' . h($text) . '</span></button>';
         };
 
-        if ($code === 'NOT_PRESENT' || $code === 'HOLIDAY') {
+        if (in_array($code, ['NOT_PRESENT', 'HOLIDAY', 'VACATION', 'SICK', 'SCHOOL', 'OTHER'], true)) {
             if (($status['work_start_allowed'] ?? true) === false) {
                 return $button('work_start', 'Arbeitsbeginn ab 07:30 Uhr', 'btn-outline-success', true);
             }
-            return $button('work_start', 'Arbeitsbeginn', 'btn-success');
+            $text = in_array($code, ['VACATION', 'SICK', 'SCHOOL', 'OTHER'], true)
+                ? 'Trotz Abwesenheit einstempeln'
+                : 'Arbeitsbeginn';
+            return $button('work_start', $text, 'btn-success');
         }
         if ($code === 'WORKING') {
             if (!empty($status['stale_session'])) {
@@ -70,7 +73,7 @@ final class Controller
         if ($code === 'ON_BREAK') {
             return $button('break_end', 'Pause beenden', 'btn-outline-warning') . $button('work_end', 'Feierabend', 'btn-danger');
         }
-        return '<div class="clock-hint">Heute ist eine Abwesenheit eingetragen.</div>';
+        return '<div class="clock-hint">Diese Aktion ist derzeit nicht verfügbar.</div>';
     }
 
     public function pageDashboard(): void

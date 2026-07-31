@@ -74,3 +74,11 @@ Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.
 - Modale werden nun zuverlässig direkt unter `body` platziert.
 - Explizite Ebenen für Dialog und Hintergrund ergänzen zusätzliche Sicherheit.
 - Der Wochenzettel-Dialog bleibt vollständig anklickbar, scrollbar und über die Schließen-Schaltfläche bedienbar.
+
+## Abwesenheit durch Einstempeln überschreiben
+
+- Mitarbeiter können sich auch dann einstempeln, wenn für den aktuellen Tag Urlaub, Krankheit, Schule oder eine sonstige Abwesenheit eingetragen ist.
+- Beim Einstempeln wird ausschließlich der aktuelle Tag aus der Abwesenheit entfernt.
+- Mehrtägige Abwesenheiten werden bei Bedarf in zwei verbleibende Zeiträume geteilt; Art und Notiz bleiben erhalten.
+- Pausen, Feierabend und die laufende Zeiterfassung funktionieren danach unverändert.
+- Im Wochenzettel hat eine tatsächlich erfasste Arbeitszeit Vorrang vor einer versehentlich überlappenden Abwesenheit.

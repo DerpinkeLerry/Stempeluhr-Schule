@@ -72,6 +72,48 @@ $tests['Arbeitsbeginn ab 07:30 ist möglich'] = static function (): void {
     assertSameValue(1, (int)$pdo->query('SELECT COUNT(*) FROM work_session')->fetchColumn(), 'Arbeitsbeginn um 07:30 wurde nicht gespeichert');
 };
 
+$tests['Einstempeln überschreibt die Abwesenheit nur für den heutigen Tag'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-30 10:00:00'); // Donnerstag 12:00
+    $pdo->prepare('INSERT INTO absence(employee_id, type, start_date, end_date, note, created_at) VALUES(?,?,?,?,?,?)')
+        ->execute([$employeeId, 'VACATION', '2026-07-27', '2026-07-31', 'Sommerurlaub', '2026-07-20 10:00:00']);
+
+    $statusBefore = $service->getLiveStatus($employeeId);
+    assertSameValue('VACATION', $statusBefore['status'], 'Vor dem Einstempeln muss Urlaub angezeigt werden');
+    assertTrueValue(($statusBefore['work_start_allowed'] ?? false) === true, 'Einstempeln muss trotz Abwesenheit angeboten werden');
+
+    $result = $service->startWork($employeeId);
+    assertTrueValue(($result['absence_overridden'] ?? false) === true, 'Das Überschreiben der Abwesenheit muss gemeldet werden');
+    assertSameValue('WORKING', $service->getLiveStatus($employeeId)['status'], 'Nach dem Einstempeln muss der Mitarbeiter arbeiten');
+
+    $absences = $pdo->query('SELECT start_date, end_date, type, note FROM absence ORDER BY start_date')->fetchAll();
+    assertSameValue(2, count($absences), 'Die mehrtägige Abwesenheit muss um den Arbeitstag geteilt werden');
+    assertSameValue('2026-07-27', $absences[0]['start_date'], 'Der erste Restzeitraum beginnt falsch');
+    assertSameValue('2026-07-29', $absences[0]['end_date'], 'Der erste Restzeitraum endet falsch');
+    assertSameValue('2026-07-31', $absences[1]['start_date'], 'Der zweite Restzeitraum beginnt falsch');
+    assertSameValue('2026-07-31', $absences[1]['end_date'], 'Der zweite Restzeitraum endet falsch');
+    assertSameValue('Sommerurlaub', $absences[1]['note'], 'Die Notiz muss beim Teilen erhalten bleiben');
+
+    $clock = new DateTimeImmutable('2026-07-30 11:00:00', new DateTimeZone('UTC'));
+    $service->startBreak($employeeId);
+    assertSameValue('ON_BREAK', $service->getLiveStatus($employeeId)['status'], 'Pausen müssen nach dem Überschreiben normal funktionieren');
+
+    $clock = new DateTimeImmutable('2026-07-30 11:15:00', new DateTimeZone('UTC'));
+    $service->endBreak($employeeId);
+    $clock = new DateTimeImmutable('2026-07-30 12:00:00', new DateTimeZone('UTC'));
+    $service->endWork($employeeId);
+    assertSameValue('NOT_PRESENT', $service->getLiveStatus($employeeId)['status'], 'Nach Feierabend darf die Abwesenheit für heute nicht zurückkehren');
+};
+
+$tests['Eintägige Abwesenheit wird beim Einstempeln gelöscht'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-30 10:00:00');
+    $pdo->prepare('INSERT INTO absence(employee_id, type, start_date, end_date, note, created_at) VALUES(?,?,?,?,?,?)')
+        ->execute([$employeeId, 'SICK', '2026-07-30', '2026-07-30', '', '2026-07-30 06:00:00']);
+
+    $service->startWork($employeeId);
+
+    assertSameValue(0, (int)$pdo->query('SELECT COUNT(*) FROM absence')->fetchColumn(), 'Eine eintägige Abwesenheit muss vollständig gelöscht werden');
+};
+
 $tests['Pausen werden von der Arbeitszeit abgezogen'] = static function (): void {
     [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-30 05:30:00'); // 07:30
     $service->startWork($employeeId);
@@ -136,6 +178,34 @@ $tests['Wochenzettel enthält Nettoarbeitszeit ohne Pause'] = static function ()
     $thursday = $report['employees'][0]['days'][3];
     assertSameValue(1800, $thursday['break_seconds'], 'Pause im Wochenzettel ist falsch');
     assertSameValue(7200, $thursday['work_seconds'], 'Arbeitszeit im Wochenzettel muss netto sein');
+};
+
+$tests['Abwesenheit wird freitags mit vier Stunden angerechnet'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-30 10:00:00');
+    $pdo->prepare('INSERT INTO absence(employee_id, type, start_date, end_date, note, created_at) VALUES(?,?,?,?,?,?)')
+        ->execute([$employeeId, 'VACATION', '2026-07-27', '2026-07-31', '', '2026-07-30 10:00:00']);
+
+    $report = $service->buildWeekReport([$employeeId]);
+    $days = $report['employees'][0]['days'];
+
+    assertSameValue(8 * 3600 + 30 * 60, $days[0]['work_seconds'], 'Montag muss weiterhin mit 8:30 Stunden angerechnet werden');
+    assertSameValue(4 * 3600, $days[4]['work_seconds'], 'Freitag muss mit 4:00 Stunden angerechnet werden');
+    assertSameValue(0, $days[5]['work_seconds'], 'Samstag darf nicht automatisch angerechnet werden');
+    assertSameValue(38 * 3600, $report['employees'][0]['work_seconds'], 'Die Wochenarbeitszeit der Abwesenheit muss 38 Stunden betragen');
+};
+
+$tests['Arbeitszeit hat im Wochenzettel Vorrang vor überlappender Abwesenheit'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-30 10:00:00');
+    $pdo->prepare('INSERT INTO work_session(employee_id, started_at, ended_at, source) VALUES(?,?,?,?)')
+        ->execute([$employeeId, '2026-07-30 06:00:00', '2026-07-30 10:00:00', 'test']); // 08:00-12:00
+    $pdo->prepare('INSERT INTO absence(employee_id, type, start_date, end_date, note, created_at) VALUES(?,?,?,?,?,?)')
+        ->execute([$employeeId, 'VACATION', '2026-07-30', '2026-07-30', '', '2026-07-30 05:00:00']);
+
+    $report = $service->buildWeekReport([$employeeId]);
+    $thursday = $report['employees'][0]['days'][3];
+    assertSameValue(4 * 3600, $thursday['work_seconds'], 'Die echte Arbeitszeit darf nicht durch Abwesenheitsgutschrift erhöht werden');
+    assertSameValue('', $thursday['note'], 'Ein Arbeitstag darf im Wochenzettel nicht als abwesend markiert werden');
+    assertSameValue(null, $thursday['absence_type'], 'Ein Arbeitstag darf keine Abwesenheitsfarbe erhalten');
 };
 
 $tests['Zeitzonen-Auswahl enthält Europe/Berlin'] = static function (): void {

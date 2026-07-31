@@ -66,6 +66,43 @@ final class TimeClockService
         return self::BASE_BREAK_SECONDS + $earlyStartBonus;
     }
 
+    public static function calculateAbsenceCreditSeconds(int $isoWeekday): int
+    {
+        return match ($isoWeekday) {
+            1, 2, 3, 4 => 8 * 3600 + 30 * 60,
+            5 => 4 * 3600,
+            default => 0,
+        };
+    }
+
+    public static function absenceRangesAfterWorkedDay(string $startDate, string $endDate, string $workedDay): array
+    {
+        if ($workedDay < $startDate || $workedDay > $endDate) {
+            return [['start_date' => $startDate, 'end_date' => $endDate]];
+        }
+
+        if ($startDate === $workedDay && $endDate === $workedDay) {
+            return [];
+        }
+
+        $workedDate = new DateTimeImmutable($workedDay . ' 00:00:00', new DateTimeZone('UTC'));
+        $ranges = [];
+        if ($startDate < $workedDay) {
+            $ranges[] = [
+                'start_date' => $startDate,
+                'end_date' => $workedDate->modify('-1 day')->format('Y-m-d'),
+            ];
+        }
+        if ($endDate > $workedDay) {
+            $ranges[] = [
+                'start_date' => $workedDate->modify('+1 day')->format('Y-m-d'),
+                'end_date' => $endDate,
+            ];
+        }
+
+        return $ranges;
+    }
+
     public static function forgottenSessionEndLocal(DateTimeImmutable $started): DateTimeImmutable
     {
         $hour = (int)$started->format('N') === 5 ? 12 : 17;
@@ -209,26 +246,30 @@ final class TimeClockService
             throw new RuntimeException('Benutzer ist nicht aktiv');
         }
 
-        $localNow = $this->now()->setTimezone(new DateTimeZone($employee['timezone']));
+        $now = $this->now();
+        $localNow = $now->setTimezone(new DateTimeZone($employee['timezone']));
         if (!self::isWorkStartAllowed($localNow)) {
             throw new RuntimeException('Arbeitsbeginn ist frühestens ab 07:30 Uhr möglich');
         }
 
-        $status = $this->getLiveStatus($employeeId);
-        if (in_array($status['status'], ['VACATION', 'SICK', 'SCHOOL', 'OTHER'], true)) {
-            throw new RuntimeException('Für heute ist eine Abwesenheit eingetragen');
-        }
+        $today = $localNow->format('Y-m-d');
 
         $this->pdo->beginTransaction();
         try {
             if ($this->getOpenWorkSession($employeeId)) {
                 throw new RuntimeException('Du bist schon eingestempelt');
             }
+
+            $absenceOverridden = $this->removeAbsenceForDay($employeeId, $today);
+
             $st = $this->pdo->prepare('INSERT INTO work_session(employee_id, started_at, source) VALUES(?,?,?)');
-            $st->execute([$employeeId, $this->nowUtc(), $source]);
+            $st->execute([$employeeId, $now->format('Y-m-d H:i:s'), $source]);
             $id = (int)$this->pdo->lastInsertId();
             $this->pdo->commit();
-            return ['work_session_id' => $id];
+            return [
+                'work_session_id' => $id,
+                'absence_overridden' => $absenceOverridden,
+            ];
         } catch (Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
@@ -370,7 +411,12 @@ final class TimeClockService
         $absence = $this->findAbsence($employeeId, $today);
         if ($absence) {
             $labels = ['VACATION' => 'Urlaub', 'SICK' => 'Krank', 'SCHOOL' => 'Schule', 'OTHER' => 'Abwesend'];
-            return ['status' => $absence['type'], 'label' => $labels[$absence['type']] ?? 'Abwesend'];
+            return [
+                'status' => $absence['type'],
+                'label' => $labels[$absence['type']] ?? 'Abwesend',
+                'work_start_allowed' => self::isWorkStartAllowed($localNow),
+                'work_start_available_at' => '07:30',
+            ];
         }
 
         if ($this->isHoliday($employee['holiday_region'], $today)) {
@@ -658,6 +704,7 @@ final class TimeClockService
                 $firstStart = null;
                 $lastEnd = null;
                 $hasOpenSession = false;
+                $hasWorkSession = false;
                 $workSeconds = 0;
                 $breakSeconds = 0;
 
@@ -667,6 +714,7 @@ final class TimeClockService
                     if ($seconds < 1) {
                         continue;
                     }
+                    $hasWorkSession = true;
                     $workSeconds += $seconds;
 
                     $startTs = max(strtotime($session['started_at'] . ' UTC'), strtotime($dayStartUtc . ' UTC'));
@@ -691,21 +739,26 @@ final class TimeClockService
                 $noteParts = [];
                 $creditAbsence = false;
                 $absenceType = null;
-                foreach ($absences as $absence) {
-                    $date = $dayStart->format('Y-m-d');
-                    if ($absence['start_date'] <= $date && $absence['end_date'] >= $date) {
-                        $noteParts[] = $absenceLabels[$absence['type']] ?? 'Abwesend';
-                        if ($absenceType === null) {
-                            $absenceType = (string)$absence['type'];
-                        }
-                        if (in_array($absence['type'], ['VACATION', 'SICK'], true)) {
-                            $creditAbsence = true;
+                if (!$hasWorkSession) {
+                    foreach ($absences as $absence) {
+                        $date = $dayStart->format('Y-m-d');
+                        if ($absence['start_date'] <= $date && $absence['end_date'] >= $date) {
+                            $noteParts[] = $absenceLabels[$absence['type']] ?? 'Abwesend';
+                            if ($absenceType === null) {
+                                $absenceType = (string)$absence['type'];
+                            }
+                            if (in_array($absence['type'], ['VACATION', 'SICK'], true)) {
+                                $creditAbsence = true;
+                            }
                         }
                     }
                 }
 
-                if ($creditAbsence && $i < 5) {
-                    $workSeconds = max($workSeconds, 8 * 3600 + 30 * 60);
+                if ($creditAbsence) {
+                    $workSeconds = max(
+                        $workSeconds,
+                        self::calculateAbsenceCreditSeconds((int)$dayStart->format('N'))
+                    );
                 }
 
                 $days[] = [
@@ -739,6 +792,52 @@ final class TimeClockService
         $st = $this->pdo->prepare('SELECT day, name, region FROM public_holiday WHERE substr(day,1,4)=? AND region=? ORDER BY day');
         $st->execute([(string)$year, $region]);
         return $st->fetchAll();
+    }
+
+    private function removeAbsenceForDay(int $employeeId, string $day): bool
+    {
+        $st = $this->pdo->prepare(
+            'SELECT * FROM absence WHERE employee_id=? AND start_date<=? AND end_date>=? ORDER BY id'
+        );
+        $st->execute([$employeeId, $day, $day]);
+        $absences = $st->fetchAll();
+        if (!$absences) {
+            return false;
+        }
+
+        foreach ($absences as $absence) {
+            $absenceId = (int)$absence['id'];
+            $ranges = self::absenceRangesAfterWorkedDay(
+                (string)$absence['start_date'],
+                (string)$absence['end_date'],
+                $day
+            );
+
+            if (!$ranges) {
+                $delete = $this->pdo->prepare('DELETE FROM absence WHERE id=?');
+                $delete->execute([$absenceId]);
+                continue;
+            }
+
+            $update = $this->pdo->prepare('UPDATE absence SET start_date=?, end_date=? WHERE id=?');
+            $update->execute([$ranges[0]['start_date'], $ranges[0]['end_date'], $absenceId]);
+
+            if (isset($ranges[1])) {
+                $insert = $this->pdo->prepare(
+                    'INSERT INTO absence(employee_id, type, start_date, end_date, note, created_at) VALUES(?,?,?,?,?,?)'
+                );
+                $insert->execute([
+                    $employeeId,
+                    $absence['type'],
+                    $ranges[1]['start_date'],
+                    $ranges[1]['end_date'],
+                    $absence['note'],
+                    $absence['created_at'],
+                ]);
+            }
+        }
+
+        return true;
     }
 
     private function findAbsence(int $employeeId, string $day): ?array
