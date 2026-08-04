@@ -1,0 +1,26 @@
+Migration der mitgelieferten Projektdatenbank
+=============================================
+
+Datum: 2026-08-04
+Zielversion: 2
+Datei: data/stempeluhr.sqlite
+SHA-256 nach Migration: edd1f0f2b5a90ea851d3ad4df648746e68386eef064fc6351c17510faef5742b
+
+Übernommene Daten:
+- Mitarbeiter: 2
+- Arbeitssitzungen: 4
+- Pausen: 0
+- Abwesenheiten: 1
+- Feiertage: 143
+
+Neu erzeugte Strukturdaten:
+- Arbeitszeitmodell-Zeilen: 14
+- Urlaubskonten: 2
+- Wochentagsregeln: 7
+
+Prüfergebnis:
+- PRAGMA integrity_check: ok
+- PRAGMA foreign_key_check: keine Fehler
+- PRAGMA user_version: 2
+
+Der Alt-Datenbank-Importer für die frühere MySQL-Stempeluhr ist noch nicht enthalten.

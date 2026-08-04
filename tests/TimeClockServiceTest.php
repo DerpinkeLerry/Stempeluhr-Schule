@@ -283,7 +283,7 @@ $tests['Leeres Passwort behält das vorhandene Passwort'] = static function (): 
     assertSameValue($originalHash, $savedHash, 'Ein leeres Passwort darf den vorhandenen Hash nicht verändern');
 };
 
-$tests['Mitarbeiter löschen entfernt zugehörige Daten'] = static function (): void {
+$tests['Mitarbeiter deaktivieren erhält zugehörige Daten'] = static function (): void {
     [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-30 10:00:00');
     $pdo->prepare('INSERT INTO employee(name, email, password_hash, role, timezone, holiday_region, active, created_at) VALUES(?,?,?,?,?,?,1,?)')
         ->execute(['Admin', 'admin@example.local', password_hash('admin123', PASSWORD_DEFAULT), 'admin', 'Europe/Berlin', 'DE-BY-KF', '2026-01-01 00:00:00']);
@@ -298,10 +298,10 @@ $tests['Mitarbeiter löschen entfernt zugehörige Daten'] = static function (): 
 
     $service->deleteEmployee($employeeId, $adminId);
 
-    assertSameValue(0, (int)$pdo->query('SELECT COUNT(*) FROM employee WHERE id=' . $employeeId)->fetchColumn(), 'Der Mitarbeiter wurde nicht gelöscht');
-    assertSameValue(0, (int)$pdo->query('SELECT COUNT(*) FROM work_session')->fetchColumn(), 'Arbeitszeiten wurden nicht mitgelöscht');
-    assertSameValue(0, (int)$pdo->query('SELECT COUNT(*) FROM break_session')->fetchColumn(), 'Pausen wurden nicht mitgelöscht');
-    assertSameValue(0, (int)$pdo->query('SELECT COUNT(*) FROM absence')->fetchColumn(), 'Abwesenheiten wurden nicht mitgelöscht');
+    assertSameValue(1, (int)$pdo->query('SELECT COUNT(*) FROM employee WHERE id=' . $employeeId . ' AND active=0 AND login_enabled=0')->fetchColumn(), 'Der Mitarbeiter wurde nicht deaktiviert');
+    assertSameValue(1, (int)$pdo->query('SELECT COUNT(*) FROM work_session')->fetchColumn(), 'Arbeitszeiten müssen erhalten bleiben');
+    assertSameValue(1, (int)$pdo->query('SELECT COUNT(*) FROM break_session')->fetchColumn(), 'Pausen müssen erhalten bleiben');
+    assertSameValue(1, (int)$pdo->query('SELECT COUNT(*) FROM absence')->fetchColumn(), 'Abwesenheiten müssen erhalten bleiben');
 };
 
 $tests['Eigenes Admin-Konto kann nicht gelöscht oder herabgestuft werden'] = static function (): void {
@@ -316,6 +316,33 @@ $tests['Eigenes Admin-Konto kann nicht gelöscht oder herabgestuft werden'] = st
         static fn() => $service->updateEmployee($employeeId, 'Admin', 'test@example.local', '', 'employee', 'Europe/Berlin', $employeeId),
         'eigenen Admin-Konto'
     );
+};
+
+$tests['Halber Urlaub bleibt beim Einstempeln bestehen'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-30 10:00:00');
+    $pdo->prepare('INSERT INTO absence(employee_id, type, portion, start_date, end_date, note) VALUES(?,?,?,?,?,?)')
+        ->execute([$employeeId, 'VACATION', 'AM', '2026-07-30', '2026-07-30', 'Halber Tag']);
+
+    $service->startWork($employeeId);
+    assertSameValue(1, (int)$pdo->query('SELECT COUNT(*) FROM absence')->fetchColumn(), 'Ein halber Urlaubstag muss neben echter Arbeitszeit bestehen bleiben');
+};
+
+$tests['Arbeitszeitmodell wird historisiert'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-30 10:00:00');
+    $service->updateSchedule($employeeId, '2026-08-01', [1 => 8, 2 => 8, 3 => 8, 4 => 8, 5 => 4, 6 => 0, 7 => 0]);
+    $schedule = $service->getSchedule($employeeId, '2026-08-03');
+    assertSameValue(480, (int)$schedule[1]['target_minutes'], 'Das neue Montags-Soll wurde nicht gespeichert');
+    assertSameValue(36.0, (float)$service->getEmployee($employeeId)['weekly_hours'], 'Die Wochenstunden wurden nicht aktualisiert');
+};
+
+$tests['Urlaubskonto zählt halbe Tage'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-30 10:00:00');
+    $service->updateVacationAccount($employeeId, 2026, 30, 2, -1, 'Test');
+    $service->createAbsence($employeeId, 'VACATION', '2026-08-03', '2026-08-03', '', 'AM');
+    $account = $service->getVacationAccount($employeeId, 2026);
+    assertSameValue(31.0, (float)$account['total_days'], 'Das verfügbare Urlaubskonto ist falsch');
+    assertSameValue(0.5, (float)$account['used_days'], 'Der halbe Urlaubstag wurde falsch gezählt');
+    assertSameValue(30.5, (float)$account['remaining_days'], 'Der Resturlaub ist falsch');
 };
 
 $passed = 0;

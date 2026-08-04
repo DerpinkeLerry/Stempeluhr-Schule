@@ -33,6 +33,7 @@ final class Controller
             'SICK' => 'status-sick',
             'SCHOOL' => 'status-school',
             'OTHER' => 'status-other',
+            'INACTIVE' => 'status-away',
         ];
         $code = $status['status'] ?? 'UNKNOWN';
         $class = !empty($status['stale_session']) ? 'status-stale' : ($classes[$code] ?? 'status-away');
@@ -57,7 +58,8 @@ final class Controller
 
         if (in_array($code, ['NOT_PRESENT', 'HOLIDAY', 'VACATION', 'SICK', 'SCHOOL', 'OTHER'], true)) {
             if (($status['work_start_allowed'] ?? true) === false) {
-                return $button('work_start', 'Arbeitsbeginn ab 07:30 Uhr', 'btn-outline-success', true);
+                $availableAt = (string)($status['work_start_available_at'] ?? '07:30');
+                return $button('work_start', 'Arbeitsbeginn ab ' . $availableAt . ' Uhr', 'btn-outline-success', true);
             }
             $text = in_array($code, ['VACATION', 'SICK', 'SCHOOL', 'OTHER'], true)
                 ? 'Trotz Abwesenheit einstempeln'
@@ -113,7 +115,15 @@ final class Controller
         $totals = $this->service->getTodayTotals($id);
         $sessions = $this->service->listRecentSessions($id, 20);
         $absences = $this->service->listAbsences($id, 30);
-        $this->render('employee', compact('employee', 'status', 'totals', 'sessions', 'absences'), 'Stempeluhr - ' . $employee['name']);
+        $timezone = new DateTimeZone((string)$employee['timezone']);
+        $today = (new DateTimeImmutable('now', $timezone))->format('Y-m-d');
+        $vacationYear = (int)($_GET['vacation_year'] ?? (new DateTimeImmutable('now', $timezone))->format('Y'));
+        if ($vacationYear < 1970 || $vacationYear > 2200) {
+            $vacationYear = (int)(new DateTimeImmutable('now', $timezone))->format('Y');
+        }
+        $schedule = $this->service->getSchedule($id, $today);
+        $vacation = $this->service->getVacationAccount($id, $vacationYear);
+        $this->render('employee', compact('employee', 'status', 'totals', 'sessions', 'absences', 'schedule', 'vacation', 'vacationYear', 'today'), 'Stempeluhr - ' . $employee['name']);
     }
 
     public function pageHolidays(): void
@@ -222,7 +232,14 @@ final class Controller
                 (string)($_POST['password'] ?? ''),
                 (string)($_POST['role'] ?? 'employee'),
                 (string)($_POST['timezone'] ?? 'Europe/Berlin'),
-                (string)cfg('default_holiday_region', 'DE-BY-KF')
+                (string)cfg('default_holiday_region', 'DE-BY-KF'),
+                (string)($_POST['personnel_number'] ?? ''),
+                (string)($_POST['department'] ?? ''),
+                (string)($_POST['phone'] ?? ''),
+                (float)($_POST['weekly_hours'] ?? 38),
+                isset($_POST['is_trainee']),
+                isset($_POST['special_time']),
+                (float)($_POST['vacation_entitlement'] ?? cfg('default_vacation_entitlement', 30))
             );
             json_response(['ok' => true, 'employeeId' => $id]);
         } catch (RuntimeException $e) {
@@ -247,7 +264,15 @@ final class Controller
                 (string)($_POST['password'] ?? ''),
                 (string)($_POST['role'] ?? 'employee'),
                 (string)($_POST['timezone'] ?? 'Europe/Berlin'),
-                $actingAdminId
+                $actingAdminId,
+                (string)($_POST['personnel_number'] ?? ''),
+                (string)($_POST['department'] ?? ''),
+                (string)($_POST['phone'] ?? ''),
+                isset($_POST['weekly_hours']) ? (float)$_POST['weekly_hours'] : null,
+                isset($_POST['is_trainee']),
+                isset($_POST['special_time']),
+                isset($_POST['active']),
+                isset($_POST['login_enabled'])
             );
 
             if ($employeeId === $actingAdminId) {
@@ -277,7 +302,7 @@ final class Controller
         } catch (RuntimeException $e) {
             json_response(['ok' => false, 'error' => $e->getMessage()], 400);
         } catch (Throwable) {
-            json_response(['ok' => false, 'error' => 'Mitarbeiter konnte nicht gelöscht werden'], 500);
+            json_response(['ok' => false, 'error' => 'Mitarbeiter konnte nicht deaktiviert werden'], 500);
         }
     }
 
@@ -309,6 +334,53 @@ final class Controller
         }
     }
 
+    public function apiScheduleUpdate(): never
+    {
+        require_post();
+        verify_csrf();
+        require_admin(true);
+
+        try {
+            $hours = [];
+            for ($weekday = 1; $weekday <= 7; $weekday++) {
+                $hours[$weekday] = (float)($_POST['day_' . $weekday] ?? 0);
+            }
+            $this->service->updateSchedule(
+                (int)($_POST['employeeId'] ?? 0),
+                (string)($_POST['effective_from'] ?? ''),
+                $hours
+            );
+            json_response(['ok' => true]);
+        } catch (RuntimeException $e) {
+            json_response(['ok' => false, 'error' => $e->getMessage()], 400);
+        } catch (Throwable) {
+            json_response(['ok' => false, 'error' => 'Arbeitszeitmodell konnte nicht gespeichert werden'], 500);
+        }
+    }
+
+    public function apiVacationUpdate(): never
+    {
+        require_post();
+        verify_csrf();
+        require_admin(true);
+
+        try {
+            $this->service->updateVacationAccount(
+                (int)($_POST['employeeId'] ?? 0),
+                (int)($_POST['year'] ?? 0),
+                (float)($_POST['entitlement_days'] ?? 0),
+                (float)($_POST['carryover_days'] ?? 0),
+                (float)($_POST['adjustment_days'] ?? 0),
+                (string)($_POST['note'] ?? '')
+            );
+            json_response(['ok' => true]);
+        } catch (RuntimeException $e) {
+            json_response(['ok' => false, 'error' => $e->getMessage()], 400);
+        } catch (Throwable) {
+            json_response(['ok' => false, 'error' => 'Urlaubskonto konnte nicht gespeichert werden'], 500);
+        }
+    }
+
     public function apiAbsenceCreate(): never
     {
         require_post();
@@ -321,7 +393,8 @@ final class Controller
                 (string)($_POST['type'] ?? 'OTHER'),
                 (string)($_POST['start_date'] ?? ''),
                 (string)($_POST['end_date'] ?? ''),
-                (string)($_POST['note'] ?? '')
+                (string)($_POST['note'] ?? ''),
+                (string)($_POST['portion'] ?? 'FULL')
             );
             json_response(['ok' => true, 'absenceId' => $id]);
         } catch (RuntimeException $e) {
@@ -343,7 +416,8 @@ final class Controller
                 (string)($_POST['type'] ?? 'OTHER'),
                 (string)($_POST['start_date'] ?? ''),
                 (string)($_POST['end_date'] ?? ''),
-                (string)($_POST['note'] ?? '')
+                (string)($_POST['note'] ?? ''),
+                (string)($_POST['portion'] ?? 'FULL')
             );
             json_response(['ok' => true]);
         } catch (RuntimeException $e) {
@@ -410,12 +484,16 @@ final class Controller
 
         $pdf->text(35, 48, 18, 'Arbeitszeitnachweis', true);
         $pdf->text(35, 76, 11, 'Mitarbeiter: ' . $employee['name'], true);
-        $pdf->text(35, 96, 10, 'Kalenderwoche: KW ' . sprintf('%02d', $week['week']) . ' / ' . $week['year']);
-        $pdf->text(35, 113, 10, 'Zeitraum: ' . $week['start_label'] . ' bis ' . $week['end_label']);
+        $meta = [];
+        if (!empty($employee['personnel_number'])) $meta[] = 'Personalnr.: ' . $employee['personnel_number'];
+        if (!empty($employee['department'])) $meta[] = 'Abteilung: ' . $employee['department'];
+        $pdf->text(35, 94, 9, implode(' | ', $meta));
+        $pdf->text(35, 110, 10, 'Kalenderwoche: KW ' . sprintf('%02d', $week['week']) . ' / ' . $week['year']);
+        $pdf->text(35, 127, 10, 'Zeitraum: ' . $week['start_label'] . ' bis ' . $week['end_label']);
         $pdf->text(405, 96, 8, 'Erstellt: ' . $report['created_at']);
 
         $left = 35.0;
-        $top = 145.0;
+        $top = 158.0;
         $rowHeight = 34.0;
         $widths = [42.0, 62.0, 55.0, 55.0, 58.0, 72.0, 181.0];
         $headers = ['Tag', 'Datum', 'Beginn', 'Ende', 'Pause', 'Arbeitszeit', 'Bemerkung'];
@@ -474,12 +552,15 @@ final class Controller
         }
 
         $summaryTop = $top + $tableHeight + 28;
-        $pdf->rect(330, $summaryTop, 230, 58, true, 0.94);
-        $pdf->rect(330, $summaryTop, 230, 58);
-        $pdf->text(342, $summaryTop + 22, 10, 'Arbeitszeit gesamt:', true);
-        $pdf->text(495, $summaryTop + 22, 10, $this->pdfDuration((int)$employeeReport['work_seconds']), true);
-        $pdf->text(342, $summaryTop + 43, 9, 'Pausen gesamt:');
-        $pdf->text(495, $summaryTop + 43, 9, $this->pdfDuration((int)$employeeReport['break_seconds']));
+        $pdf->rect(300, $summaryTop, 260, 82, true, 0.94);
+        $pdf->rect(300, $summaryTop, 260, 82);
+        $pdf->text(312, $summaryTop + 20, 9, 'Sollzeit:', true);
+        $pdf->text(495, $summaryTop + 20, 9, $this->pdfDuration((int)$employeeReport['planned_seconds']), true);
+        $pdf->text(312, $summaryTop + 40, 9, 'Arbeitszeit:', true);
+        $pdf->text(495, $summaryTop + 40, 9, $this->pdfDuration((int)$employeeReport['work_seconds']), true);
+        $pdf->text(312, $summaryTop + 60, 9, 'Differenz:', true);
+        $pdf->text(495, $summaryTop + 60, 9, $this->pdfSignedDuration((int)$employeeReport['difference_seconds']), true);
+        $pdf->text(312, $summaryTop + 78, 8, 'Pausen: ' . $this->pdfDuration((int)$employeeReport['break_seconds']));
 
         $pdf->text(35, 565, 10, 'Die oben aufgeführten Arbeitszeiten wurden geprüft.');
         $pdf->line(120, 675, 560, 675);
@@ -492,6 +573,12 @@ final class Controller
     {
         $seconds = max(0, $seconds);
         return sprintf('%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60));
+    }
+
+    private function pdfSignedDuration(int $seconds): string
+    {
+        $sign = $seconds < 0 ? '-' : '+';
+        return $sign . $this->pdfDuration(abs($seconds));
     }
 
     private function shortPdfText(string $text, int $length): string

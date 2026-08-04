@@ -31,12 +31,12 @@
    - Freitags beträgt der Pausenanspruch grundsätzlich 0 Minuten; bei Arbeitsbeginn vor 08:00 Uhr wird ausschließlich die Zeit bis 08:00 Uhr gutgeschrieben.
    - Die Pausenanzeige bewegt sich beim Starten und Beenden einer Pause dezent und flüssig.
 
-7. **Mitarbeiter bearbeiten und löschen**
+7. **Mitarbeiter bearbeiten und deaktivieren**
    - In der Teamübersicht steht für jeden Mitarbeiter ein Bearbeiten-Dialog zur Verfügung.
    - Name, E-Mail, Rolle und Zeitzone können geändert werden.
    - Optional kann ein neues Passwort vergeben werden; ein leeres Passwortfeld behält das bisherige Passwort bei.
-   - Mitarbeiter können direkt im Bearbeiten-Dialog gelöscht werden. Zugehörige Arbeitszeiten, Pausen und Abwesenheiten werden dabei ebenfalls entfernt.
-   - Das aktuell angemeldete Admin-Konto kann weder gelöscht noch zum Mitarbeiter herabgestuft werden.
+   - Mitarbeiter können direkt im Bearbeiten-Dialog deaktiviert werden. Arbeitszeiten, Pausen, Abwesenheiten und Urlaubskonten bleiben vollständig erhalten.
+   - Das aktuell angemeldete Admin-Konto kann weder deaktiviert noch zum Mitarbeiter herabgestuft werden.
 
 ## Prüfungen
 
@@ -83,3 +83,36 @@ Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.
 - Mehrtägige Abwesenheiten werden bei Bedarf in zwei verbleibende Zeiträume geteilt; Art und Notiz bleiben erhalten.
 - Pausen, Feierabend und die laufende Zeiterfassung funktionieren danach unverändert.
 - Im Wochenzettel hat eine tatsächlich erfasste Arbeitszeit Vorrang vor einer versehentlich überlappenden Abwesenheit.
+
+
+## Schema Version 2 – Vorbereitung der Altdatenmigration
+
+- eindeutige Personalnummer und technische Legacy-ID je Mitarbeiter
+- Abteilung, Telefon, Wochenstunden, Auszubildenden- und Sonderzeitmerkmal
+- getrennte Aktiv- und Login-Schalter; keine physische Löschung von Mitarbeitern mehr
+- historisierte Arbeitszeitmodelle mit Gültigkeitszeitraum und Sollminuten je Wochentag
+- Urlaubskonten pro Kalenderjahr mit Anspruch, Übertrag und manueller Korrektur
+- ganze sowie halbe Urlaubstage (`FULL`, `AM`, `PM`)
+- Legacy-Referenzen an Arbeitszeiten, Pausen, Abwesenheiten, Feiertagen und Überstundenereignissen
+- Importprotokolltabelle `import_batch` für den späteren MySQL-Importer
+- Wochenzettel mit Sollzeit und Wochenabweichung
+- automatische Strukturmigration älterer Projektdatenbanken auf `PRAGMA user_version = 2`
+- mitgelieferte SQLite-Datenbank verlustfrei auf Version 2 übertragen
+- vollständige Dokumentation unter `database/STRUCTURE.md`
+
+## Read-only MySQL-Importer
+
+- CLI-Importer für die alte `StempelUhrAdmin`-MySQL-Datenbank ergänzt
+- MySQL-Zugriff ausschließlich über `SHOW` und `SELECT` in einem READ-ONLY-Snapshot
+- Modi `--inspect`, `--dry-run` und `--execute`
+- automatische Erkennung und konfigurierbare Zuordnung alter Tabellen und Spalten
+- Import von Mitarbeitern, Arbeitsmodellen, Urlaubskonten, Arbeitszeiten, Pausen, Abwesenheiten, Feiertagen und optionalen Überstundenereignissen
+- Unterscheidung zwischen `worktime.other` und gesetzlichen Feiertagen
+- heuristische Zuordnung alter halber Urlaubstage zu `AM` oder `PM` mit Warnbericht
+- konfigurierbare Korrektur alter Unix-Zeitstempel nach kontrollierter Stichprobe
+- Duplikatschutz über alle vorhandenen `legacy_*`-Spalten
+- Konfliktschutz bei gleichen Personalnummern und abweichenden Namen
+- automatische konsistente SQLite-Sicherung vor dem Echtimport
+- vollständiger SQLite-Import in einer Transaktion mit Rollback bei Fehlern
+- Text- und JSON-Prüfberichte unter `data/import-reports`
+- ausführliche Anleitung unter `tools/README_MYSQL_IMPORT.md`

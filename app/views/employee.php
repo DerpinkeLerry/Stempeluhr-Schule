@@ -2,6 +2,8 @@
 declare(strict_types=1);
 $typeLabels = ['VACATION' => 'Urlaub', 'SICK' => 'Krank', 'SCHOOL' => 'Schule', 'OTHER' => 'Sonstiges'];
 $typeClasses = ['VACATION' => 'absence-vacation', 'SICK' => 'absence-sick', 'SCHOOL' => 'absence-school', 'OTHER' => 'absence-other'];
+$portionLabels = ['FULL' => 'Ganzer Tag', 'AM' => 'Vormittag', 'PM' => 'Nachmittag'];
+$dayLabels = [1 => 'Montag', 2 => 'Dienstag', 3 => 'Mittwoch', 4 => 'Donnerstag', 5 => 'Freitag', 6 => 'Samstag', 7 => 'Sonntag'];
 $parts = preg_split('/\s+/', trim((string)$employee['name'])) ?: [];
 $initials = '';
 foreach ($parts as $part) {
@@ -24,9 +26,11 @@ foreach ($parts as $part) {
                 <div class="eyebrow eyebrow-light">Mitarbeiterprofil</div>
                 <h1><?= h($employee['name']) ?></h1>
                 <div class="profile-meta">
+                    <?php if (!empty($employee['personnel_number'])): ?><span>Personalnr. <?= h($employee['personnel_number']) ?></span><?php endif; ?>
+                    <?php if (!empty($employee['department'])): ?><span><?= h($employee['department']) ?></span><?php endif; ?>
                     <span><?= h($employee['email']) ?></span>
-                    <span><?= $employee['role'] === 'admin' ? 'Administration' : 'Mitarbeiter' ?></span>
-                    <span><?= h($employee['timezone']) ?></span>
+                    <span><?= h(number_format((float)$employee['weekly_hours'], 2, ',', '.')) ?> Std./Woche</span>
+                    <span><?= (int)$employee['active'] === 1 ? 'Aktiv' : 'Inaktiv' ?></span>
                 </div>
             </div>
         </div>
@@ -35,6 +39,39 @@ foreach ($parts as $part) {
             <div class="profile-time"><strong id="employeeToday"><?= h(seconds_to_hhmmss($totals['net_seconds'])) ?></strong><span>Arbeitszeit heute</span></div>
         </div>
     </section>
+
+    <div class="row g-4 mb-4">
+        <div class="col-xl-5">
+            <section class="surface-card h-100">
+                <div class="section-heading compact-heading"><div><div class="eyebrow">Urlaub <?= (int)$vacationYear ?></div><h2>Urlaubskonto</h2></div><span class="count-badge"><?= h(number_format((float)$vacation['remaining_days'], 1, ',', '.')) ?> Tage</span></div>
+                <div class="row g-2 mb-3 text-center">
+                    <div class="col-4"><div class="stat-card p-3"><div><strong><?= h(number_format((float)$vacation['total_days'], 1, ',', '.')) ?></strong><span>Verfügbar</span></div></div></div>
+                    <div class="col-4"><div class="stat-card p-3"><div><strong><?= h(number_format((float)$vacation['used_days'], 1, ',', '.')) ?></strong><span>Genommen</span></div></div></div>
+                    <div class="col-4"><div class="stat-card p-3"><div><strong><?= h(number_format((float)$vacation['remaining_days'], 1, ',', '.')) ?></strong><span>Rest</span></div></div></div>
+                </div>
+                <form id="formVacation" data-employee-id="<?= (int)$employee['id'] ?>" class="row g-2">
+                    <div class="col-3"><label class="form-label">Jahr</label><input class="form-control" name="year" type="number" min="1970" max="2200" value="<?= (int)$vacationYear ?>" required></div>
+                    <div class="col-3"><label class="form-label">Anspruch</label><input class="form-control" name="entitlement_days" type="number" step="0.5" min="0" max="365" value="<?= h((string)$vacation['entitlement_days']) ?>"></div>
+                    <div class="col-3"><label class="form-label">Übertrag</label><input class="form-control" name="carryover_days" type="number" step="0.5" min="-365" max="365" value="<?= h((string)$vacation['carryover_days']) ?>"></div>
+                    <div class="col-3"><label class="form-label">Korrektur</label><input class="form-control" name="adjustment_days" type="number" step="0.5" min="-365" max="365" value="<?= h((string)$vacation['adjustment_days']) ?>"></div>
+                    <div class="col-12"><label class="form-label">Notiz</label><input class="form-control" name="note" maxlength="200" value="<?= h((string)($vacation['note'] ?? '')) ?>"></div>
+                    <div class="col-12"><button class="btn btn-brand w-100" type="submit">Urlaubskonto speichern</button></div>
+                </form>
+            </section>
+        </div>
+        <div class="col-xl-7">
+            <section class="surface-card h-100">
+                <div class="section-heading compact-heading"><div><div class="eyebrow">Historisiert</div><h2>Arbeitszeitmodell</h2><p>Neue Werte gelten ab dem gewählten Datum; alte Wochen bleiben unverändert.</p></div></div>
+                <form id="formSchedule" data-employee-id="<?= (int)$employee['id'] ?>" class="row g-2">
+                    <?php foreach ($dayLabels as $weekday => $dayLabel): $hours = ((int)$schedule[$weekday]['target_minutes']) / 60; ?>
+                        <div class="col-6 col-md"><label class="form-label"><?= h(substr($dayLabel, 0, 2)) ?></label><input class="form-control" name="day_<?= $weekday ?>" type="number" min="0" max="24" step="0.25" value="<?= h(rtrim(rtrim(number_format($hours, 2, '.', ''), '0'), '.')) ?>"></div>
+                    <?php endforeach; ?>
+                    <div class="col-md-4"><label class="form-label">Gültig ab</label><input class="form-control" name="effective_from" type="date" value="<?= h($today) ?>" required></div>
+                    <div class="col-md-8 d-flex align-items-end"><button class="btn btn-brand w-100" type="submit">Arbeitszeitmodell speichern</button></div>
+                </form>
+            </section>
+        </div>
+    </div>
 
     <div class="row g-4 align-items-start">
         <div class="col-xl-7">
@@ -92,6 +129,15 @@ foreach ($parts as $part) {
                                 <option value="OTHER">Sonstiges</option>
                             </select>
                         </div>
+                        <div class="col-12">
+                            <label class="form-label" for="absencePortion">Umfang</label>
+                            <select class="form-select" id="absencePortion" name="portion">
+                                <option value="FULL">Ganzer Tag / Zeitraum</option>
+                                <option value="AM">Halber Tag vormittags</option>
+                                <option value="PM">Halber Tag nachmittags</option>
+                            </select>
+                            <small class="form-text">Halbe Tage sind nur bei Urlaub und nur für ein einzelnes Datum möglich.</small>
+                        </div>
                         <div class="col-sm-6">
                             <label class="form-label" for="absenceStart">Von</label>
                             <input class="form-control" id="absenceStart" type="date" name="start_date" required>
@@ -128,7 +174,7 @@ foreach ($parts as $part) {
                             <span class="absence-marker" aria-hidden="true"></span>
                             <div class="absence-content">
                                 <div class="absence-title-row">
-                                    <strong><?= h($typeLabels[$absence['type']] ?? $absence['type']) ?></strong>
+                                    <strong><?= h(($typeLabels[$absence['type']] ?? $absence['type']) . (($absence['portion'] ?? 'FULL') !== 'FULL' ? ' · ' . ($portionLabels[$absence['portion']] ?? $absence['portion']) : '')) ?></strong>
                                     <span><?= h(date('d.m.Y', strtotime($absence['start_date']))) ?> – <?= h(date('d.m.Y', strtotime($absence['end_date']))) ?></span>
                                 </div>
                                 <?php if ($absence['note'] !== ''): ?><p><?= h($absence['note']) ?></p><?php endif; ?>
@@ -141,6 +187,7 @@ foreach ($parts as $part) {
                                     data-bs-target="#absenceEditModal"
                                     data-absence-id="<?= (int)$absence['id'] ?>"
                                     data-type="<?= h($absence['type']) ?>"
+                                    data-portion="<?= h((string)($absence['portion'] ?? 'FULL')) ?>"
                                     data-start-date="<?= h($absence['start_date']) ?>"
                                     data-end-date="<?= h($absence['end_date']) ?>"
                                     data-note="<?= h($absence['note']) ?>"
@@ -187,6 +234,14 @@ foreach ($parts as $part) {
                                 <option value="SICK">Krank</option>
                                 <option value="SCHOOL">Schule</option>
                                 <option value="OTHER">Sonstiges</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Umfang</label>
+                            <select class="form-select" name="portion">
+                                <option value="FULL">Ganzer Tag / Zeitraum</option>
+                                <option value="AM">Halber Tag vormittags</option>
+                                <option value="PM">Halber Tag nachmittags</option>
                             </select>
                         </div>
                         <div class="col-6">

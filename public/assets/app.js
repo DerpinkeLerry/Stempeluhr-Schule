@@ -97,7 +97,8 @@
             VACATION: 'status-vacation',
             SICK: 'status-sick',
             SCHOOL: 'status-school',
-            OTHER: 'status-other'
+            OTHER: 'status-other',
+            INACTIVE: 'status-away'
         };
         const className = status?.stale_session ? 'status-stale' : (classes[status?.status] || 'status-away');
         return `<span class="status-badge ${className}${large ? ' status-big' : ''}">${escapeHtml(status?.label || 'Unbekannt')}</span>`;
@@ -121,7 +122,8 @@
         const startableStatuses = ['NOT_PRESENT', 'HOLIDAY', 'VACATION', 'SICK', 'SCHOOL', 'OTHER'];
         if (startableStatuses.includes(status?.status)) {
             if (status?.work_start_allowed === false) {
-                return actionButton(employeeId, 'work_start', 'Arbeitsbeginn ab 07:30 Uhr', 'btn-outline-success', true);
+                const availableAt = status?.work_start_available_at || '07:30';
+                return actionButton(employeeId, 'work_start', `Arbeitsbeginn ab ${availableAt} Uhr`, 'btn-outline-success', true);
             }
             const text = ['VACATION', 'SICK', 'SCHOOL', 'OTHER'].includes(status?.status)
                 ? 'Trotz Abwesenheit einstempeln'
@@ -351,6 +353,14 @@
         employeeEditForm.elements.email.value = button.dataset.email || '';
         employeeEditForm.elements.role.value = button.dataset.role || 'employee';
         employeeEditForm.elements.timezone.value = button.dataset.timezone || 'Europe/Berlin';
+        employeeEditForm.elements.personnel_number.value = button.dataset.personnelNumber || '';
+        employeeEditForm.elements.department.value = button.dataset.department || '';
+        employeeEditForm.elements.phone.value = button.dataset.phone || '';
+        employeeEditForm.elements.weekly_hours.value = button.dataset.weeklyHours || '0';
+        employeeEditForm.elements.is_trainee.checked = button.dataset.isTrainee === '1';
+        employeeEditForm.elements.special_time.checked = button.dataset.specialTime === '1';
+        employeeEditForm.elements.active.checked = button.dataset.active === '1';
+        employeeEditForm.elements.login_enabled.checked = button.dataset.loginEnabled === '1';
         employeeEditForm.elements.password.value = '';
 
         const isOwnAccount = button.dataset.employeeId === employeeEditForm.dataset.currentAdminId;
@@ -360,8 +370,8 @@
         }
         if (employeeDeleteHelp) {
             employeeDeleteHelp.textContent = isOwnAccount
-                ? 'Das aktuell angemeldete Admin-Konto kann nicht gelöscht werden.'
-                : 'Arbeitszeiten und Abwesenheiten werden ebenfalls gelöscht.';
+                ? 'Das aktuell angemeldete Admin-Konto kann nicht deaktiviert werden.'
+                : 'Alle Arbeitszeiten und Abwesenheiten bleiben erhalten.';
         }
         if (employeeEditTitle) {
             employeeEditTitle.textContent = button.dataset.name
@@ -390,7 +400,7 @@
             const employeeId = employeeEditForm.elements.employeeId.value;
             const employeeName = deleteEmployeeButton.dataset.employeeName || 'diesen Mitarbeiter';
             if (!employeeId || deleteEmployeeButton.disabled) return;
-            if (!window.confirm(`${employeeName} wirklich dauerhaft löschen? Arbeitszeiten und Abwesenheiten werden ebenfalls gelöscht.`)) return;
+            if (!window.confirm(`${employeeName} wirklich deaktivieren? Die gesamte Historie bleibt erhalten.`)) return;
 
             setButtonLoading(deleteEmployeeButton, true);
             try {
@@ -427,6 +437,7 @@
         if (!button || !absenceEditForm) return;
         absenceEditForm.elements.absenceId.value = button.dataset.absenceId || '';
         absenceEditForm.elements.type.value = button.dataset.type || 'OTHER';
+        absenceEditForm.elements.portion.value = button.dataset.portion || 'FULL';
         absenceEditForm.elements.start_date.value = button.dataset.startDate || '';
         absenceEditForm.elements.end_date.value = button.dataset.endDate || '';
         absenceEditForm.elements.note.value = button.dataset.note || '';
@@ -446,6 +457,56 @@
             }
         });
     }
+
+    const scheduleForm = document.getElementById('formSchedule');
+    if (scheduleForm) {
+        scheduleForm.addEventListener('submit', async event => {
+            event.preventDefault();
+            const submit = scheduleForm.querySelector('[type="submit"]');
+            const data = Object.fromEntries(new FormData(scheduleForm).entries());
+            data.employeeId = scheduleForm.dataset.employeeId;
+            setButtonLoading(submit, true);
+            try {
+                await apiPost('/api/schedule/update', data);
+                location.reload();
+            } catch (error) {
+                showToast(error.message, 'danger');
+                setButtonLoading(submit, false);
+            }
+        });
+    }
+
+    const vacationForm = document.getElementById('formVacation');
+    if (vacationForm) {
+        vacationForm.addEventListener('submit', async event => {
+            event.preventDefault();
+            const submit = vacationForm.querySelector('[type="submit"]');
+            const data = Object.fromEntries(new FormData(vacationForm).entries());
+            data.employeeId = vacationForm.dataset.employeeId;
+            setButtonLoading(submit, true);
+            try {
+                await apiPost('/api/vacation/update', data);
+                const employeeId = vacationForm.dataset.employeeId;
+                location.href = endpoint(`/employee?id=${employeeId}&vacation_year=${data.year}`);
+            } catch (error) {
+                showToast(error.message, 'danger');
+                setButtonLoading(submit, false);
+            }
+        });
+    }
+
+    function syncAbsencePortion(form) {
+        if (!form?.elements?.type || !form?.elements?.portion) return;
+        const vacation = form.elements.type.value === 'VACATION';
+        Array.from(form.elements.portion.options).forEach(option => {
+            if (option.value !== 'FULL') option.disabled = !vacation;
+        });
+        if (!vacation) form.elements.portion.value = 'FULL';
+    }
+    [absenceForm, absenceEditForm].filter(Boolean).forEach(form => {
+        form.elements.type.addEventListener('change', () => syncAbsencePortion(form));
+        syncAbsencePortion(form);
+    });
 
     const weekReportForm = document.getElementById('weekReportForm');
     const selectAllEmployees = document.getElementById('selectAllEmployees');

@@ -59,13 +59,25 @@ foreach ($statuses as $itemStatus) {
             </button>
         </div>
         <form id="formEmployee" class="row g-3">
-            <div class="col-lg-4 col-md-6">
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label" for="employeePersonnelNumber">Personalnummer</label>
+                <input class="form-control" id="employeePersonnelNumber" name="personnel_number" maxlength="50" placeholder="z. B. 00123" required>
+            </div>
+            <div class="col-lg-5 col-md-6">
                 <label class="form-label" for="employeeName">Name</label>
                 <input class="form-control" id="employeeName" name="name" required maxlength="100" autocomplete="name" placeholder="Vor- und Nachname">
             </div>
             <div class="col-lg-4 col-md-6">
+                <label class="form-label" for="employeeDepartment">Abteilung</label>
+                <input class="form-control" id="employeeDepartment" name="department" maxlength="100" placeholder="z. B. Produktion">
+            </div>
+            <div class="col-lg-4 col-md-6">
                 <label class="form-label" for="employeeEmail">E-Mail</label>
                 <input class="form-control" id="employeeEmail" name="email" type="email" required autocomplete="email" placeholder="name@unternehmen.de">
+            </div>
+            <div class="col-lg-4 col-md-6">
+                <label class="form-label" for="employeePhone">Telefon</label>
+                <input class="form-control" id="employeePhone" name="phone" maxlength="50" autocomplete="tel">
             </div>
             <div class="col-lg-4 col-md-6">
                 <label class="form-label" for="employeePassword">Passwort</label>
@@ -78,7 +90,15 @@ foreach ($statuses as $itemStatus) {
                     <option value="admin">Administration</option>
                 </select>
             </div>
-            <div class="col-lg-4 col-md-6">
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label" for="employeeWeeklyHours">Wochenstunden</label>
+                <input class="form-control" id="employeeWeeklyHours" name="weekly_hours" type="number" min="0" max="168" step="0.25" value="38">
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <label class="form-label" for="employeeVacation">Urlaubsanspruch</label>
+                <input class="form-control" id="employeeVacation" name="vacation_entitlement" type="number" min="0" max="365" step="0.5" value="<?= h((string)cfg('default_vacation_entitlement', 30)) ?>">
+            </div>
+            <div class="col-lg-3 col-md-6">
                 <label class="form-label" for="employeeTimezone">Zeitzone</label>
                 <select class="form-select" id="employeeTimezone" name="timezone" required>
                     <?php foreach ($timezoneOptions as $group => $options): ?>
@@ -90,18 +110,12 @@ foreach ($statuses as $itemStatus) {
                     <?php endforeach; ?>
                 </select>
             </div>
-            <div class="col-lg-3 col-md-6">
-                <label class="form-label" for="employeeLocation">Standort</label>
-                <div class="input-with-icon">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
-                    <input class="form-control" id="employeeLocation" value="Kaufbeuren, Bayern" disabled>
-                </div>
+            <div class="col-lg-8 d-flex flex-wrap align-items-center gap-4">
+                <div class="form-check"><input class="form-check-input" id="employeeTrainee" name="is_trainee" type="checkbox" value="1"><label class="form-check-label" for="employeeTrainee">Auszubildender</label></div>
+                <div class="form-check"><input class="form-check-input" id="employeeSpecialTime" name="special_time" type="checkbox" value="1"><label class="form-check-label" for="employeeSpecialTime">Sonderarbeitszeit</label></div>
             </div>
-            <div class="col-lg-2 d-flex align-items-end">
-                <button class="btn btn-brand w-100" type="submit">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
-                    Speichern
-                </button>
+            <div class="col-lg-4 d-flex align-items-end">
+                <button class="btn btn-brand w-100" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>Speichern</button>
             </div>
         </form>
     </section>
@@ -141,13 +155,13 @@ foreach ($statuses as $itemStatus) {
                     if (strlen($initials) >= 2) break;
                 }
                 ?>
-                <tr data-employee-id="<?= $id ?>" data-search="<?= h(strtolower($employee['name'] . ' ' . $employee['email'])) ?>">
+                <tr data-employee-id="<?= $id ?>" data-search="<?= h(strtolower(($employee['personnel_number'] ?? '') . ' ' . $employee['name'] . ' ' . ($employee['email'] ?? '') . ' ' . ($employee['department'] ?? ''))) ?>">
                     <td>
                         <div class="employee-identity">
                             <span class="employee-avatar" aria-hidden="true"><?= h($initials ?: 'M') ?></span>
                             <span>
                                 <strong><?= h($employee['name']) ?></strong>
-                                <small><?= h($employee['email']) ?></small>
+                                <small><?= h(($employee['personnel_number'] ? $employee['personnel_number'] . ' · ' : '') . ($employee['department'] ?: $employee['email'])) ?></small>
                             </span>
                         </div>
                     </td>
@@ -165,6 +179,14 @@ foreach ($statuses as $itemStatus) {
                                 data-email="<?= h($employee['email']) ?>"
                                 data-role="<?= h($employee['role']) ?>"
                                 data-timezone="<?= h($employee['timezone']) ?>"
+                                data-personnel-number="<?= h((string)($employee['personnel_number'] ?? '')) ?>"
+                                data-department="<?= h((string)($employee['department'] ?? '')) ?>"
+                                data-phone="<?= h((string)($employee['phone'] ?? '')) ?>"
+                                data-weekly-hours="<?= h((string)($employee['weekly_hours'] ?? '0')) ?>"
+                                data-is-trainee="<?= (int)($employee['is_trainee'] ?? 0) ?>"
+                                data-special-time="<?= (int)($employee['special_time'] ?? 0) ?>"
+                                data-active="<?= (int)($employee['active'] ?? 0) ?>"
+                                data-login-enabled="<?= (int)($employee['login_enabled'] ?? 0) ?>"
                             >
                                 Bearbeiten
                                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 4 6 6M4 20l4-1 11-11a2 2 0 0 0-3-3L5 16l-1 4Z"/></svg>
@@ -195,42 +217,28 @@ foreach ($statuses as $itemStatus) {
                     <div class="modal-title-group">
                         <div class="eyebrow">Zugang verwalten</div>
                         <h2 class="modal-title" id="employeeEditTitle">Mitarbeiter bearbeiten</h2>
-                        <p>Daten ändern oder den Zugang dauerhaft löschen.</p>
+                        <p>Stammdaten, Zugang und Beschäftigungsstatus verwalten.</p>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
                 </div>
                 <div class="modal-body">
                     <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label" for="employeeEditName">Name</label>
-                            <input class="form-control" id="employeeEditName" name="name" required maxlength="100" autocomplete="name">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label" for="employeeEditEmail">E-Mail</label>
-                            <input class="form-control" id="employeeEditEmail" name="email" type="email" required autocomplete="email">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label" for="employeeEditRole">Rolle</label>
-                            <select class="form-select" id="employeeEditRole" name="role">
-                                <option value="employee">Mitarbeiter</option>
-                                <option value="admin">Administration</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label" for="employeeEditPassword">Neues Passwort</label>
-                            <input class="form-control" id="employeeEditPassword" name="password" type="password" minlength="6" autocomplete="new-password" placeholder="Leer lassen, um es beizubehalten">
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label" for="employeeEditTimezone">Zeitzone</label>
-                            <select class="form-select" id="employeeEditTimezone" name="timezone" required>
-                                <?php foreach ($timezoneOptions as $group => $options): ?>
-                                    <optgroup label="<?= h($group) ?>">
-                                        <?php foreach ($options as $option): ?>
-                                            <option value="<?= h($option['value']) ?>"><?= h($option['label']) ?></option>
-                                        <?php endforeach; ?>
-                                    </optgroup>
-                                <?php endforeach; ?>
-                            </select>
+                        <div class="col-md-4"><label class="form-label">Personalnummer</label><input class="form-control" name="personnel_number" maxlength="50"></div>
+                        <div class="col-md-8"><label class="form-label">Name</label><input class="form-control" name="name" required maxlength="100" autocomplete="name"></div>
+                        <div class="col-md-6"><label class="form-label">E-Mail</label><input class="form-control" name="email" type="email" required autocomplete="email"></div>
+                        <div class="col-md-6"><label class="form-label">Telefon</label><input class="form-control" name="phone" maxlength="50"></div>
+                        <div class="col-md-6"><label class="form-label">Abteilung</label><input class="form-control" name="department" maxlength="100"></div>
+                        <div class="col-md-3"><label class="form-label">Wochenstunden</label><input class="form-control" name="weekly_hours" type="number" min="0" max="168" step="0.25"></div>
+                        <div class="col-md-3"><label class="form-label">Rolle</label><select class="form-select" name="role"><option value="employee">Mitarbeiter</option><option value="admin">Administration</option></select></div>
+                        <div class="col-md-6"><label class="form-label">Neues Passwort</label><input class="form-control" name="password" type="password" minlength="6" autocomplete="new-password" placeholder="Leer lassen, um es beizubehalten"></div>
+                        <div class="col-md-6"><label class="form-label">Zeitzone</label><select class="form-select" name="timezone" required>
+                            <?php foreach ($timezoneOptions as $group => $options): ?><optgroup label="<?= h($group) ?>"><?php foreach ($options as $option): ?><option value="<?= h($option['value']) ?>"><?= h($option['label']) ?></option><?php endforeach; ?></optgroup><?php endforeach; ?>
+                        </select></div>
+                        <div class="col-12 d-flex flex-wrap gap-4">
+                            <div class="form-check"><input class="form-check-input" name="is_trainee" id="editTrainee" type="checkbox" value="1"><label class="form-check-label" for="editTrainee">Auszubildender</label></div>
+                            <div class="form-check"><input class="form-check-input" name="special_time" id="editSpecial" type="checkbox" value="1"><label class="form-check-label" for="editSpecial">Sonderarbeitszeit</label></div>
+                            <div class="form-check"><input class="form-check-input" name="active" id="editActive" type="checkbox" value="1"><label class="form-check-label" for="editActive">Aktiv beschäftigt</label></div>
+                            <div class="form-check"><input class="form-check-input" name="login_enabled" id="editLogin" type="checkbox" value="1"><label class="form-check-label" for="editLogin">Anmeldung erlaubt</label></div>
                         </div>
                     </div>
                 </div>
@@ -238,9 +246,9 @@ foreach ($statuses as $itemStatus) {
                     <div class="employee-delete-area">
                         <button type="button" class="btn btn-danger" id="deleteEmployeeButton">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V3h8v3M19 6l-1 15H6L5 6M10 11v5M14 11v5"/></svg>
-                            Mitarbeiter löschen
+                            Mitarbeiter deaktivieren
                         </button>
-                        <small id="employeeDeleteHelp">Arbeitszeiten und Abwesenheiten werden ebenfalls gelöscht.</small>
+                        <small id="employeeDeleteHelp">Alle Arbeitszeiten und Abwesenheiten bleiben erhalten.</small>
                     </div>
                     <div class="employee-edit-actions">
                         <button type="button" class="btn btn-quiet" data-bs-dismiss="modal">Abbrechen</button>
@@ -286,12 +294,12 @@ foreach ($statuses as $itemStatus) {
                 <div class="report-employee-list" id="reportEmployeeList">
                     <?php foreach ($employees as $employee): ?>
                         <?php if (!(int)$employee['active']) continue; ?>
-                        <label class="report-employee-item" data-search="<?= h(strtolower($employee['name'] . ' ' . $employee['email'])) ?>">
+                        <label class="report-employee-item" data-search="<?= h(strtolower(($employee['personnel_number'] ?? '') . ' ' . $employee['name'] . ' ' . ($employee['email'] ?? '') . ' ' . ($employee['department'] ?? ''))) ?>">
                             <input class="form-check-input report-employee-checkbox" type="checkbox" name="employee_ids[]" value="<?= (int)$employee['id'] ?>" checked>
                             <span class="report-avatar" aria-hidden="true"><?= h(strtoupper(substr((string)$employee['name'], 0, 1))) ?></span>
                             <span class="report-person">
                                 <strong><?= h($employee['name']) ?></strong>
-                                <small><?= h($employee['email']) ?></small>
+                                <small><?= h(($employee['personnel_number'] ? $employee['personnel_number'] . ' · ' : '') . ($employee['department'] ?: $employee['email'])) ?></small>
                             </span>
                             <svg class="check-mark" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
                         </label>
