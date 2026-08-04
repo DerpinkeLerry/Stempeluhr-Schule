@@ -1,6 +1,0 @@
-/data/backups/
-*.log
-.env
-/tools/mysql-import.php
-/data/import-reports/
-/data/*.before-legacy-import-*.sqlite
