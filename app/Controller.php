@@ -22,6 +22,39 @@ final class Controller
         require __DIR__ . '/views/layout.php';
     }
 
+    private function employeeStatusPriority(array $status): int
+    {
+        $code = (string)($status['status'] ?? 'UNKNOWN');
+
+        if ($code === 'INACTIVE') {
+            return 3;
+        }
+        if (!empty($status['stale_session'])) {
+            return 2;
+        }
+
+        return match ($code) {
+            'WORKING' => 0,
+            'ON_BREAK' => 1,
+            default => 2,
+        };
+    }
+
+    private function compareEmployeeStatus(array $leftEmployee, array $leftStatus, array $rightEmployee, array $rightStatus): int
+    {
+        $priorityComparison = $this->employeeStatusPriority($leftStatus) <=> $this->employeeStatusPriority($rightStatus);
+        if ($priorityComparison !== 0) {
+            return $priorityComparison;
+        }
+
+        $nameComparison = strnatcasecmp((string)($leftEmployee['name'] ?? ''), (string)($rightEmployee['name'] ?? ''));
+        if ($nameComparison !== 0) {
+            return $nameComparison;
+        }
+
+        return (int)($leftEmployee['id'] ?? 0) <=> (int)($rightEmployee['id'] ?? 0);
+    }
+
     public function renderStatusBadge(array $status, bool $large = false): string
     {
         $classes = [
@@ -94,6 +127,12 @@ final class Controller
             $statuses[$id] = $this->service->getLiveStatus($id);
             $totals[$id] = $this->service->getTodayTotals($id);
         }
+        usort($employees, fn(array $left, array $right): int => $this->compareEmployeeStatus(
+            $left,
+            $statuses[(int)$left['id']] ?? [],
+            $right,
+            $statuses[(int)$right['id']] ?? []
+        ));
         $week = $this->service->getCurrentWeekInfo();
         $timezoneOptions = $this->service->listTimezoneOptions();
         $currentAdminId = (int)($_SESSION['user_id'] ?? 0);
@@ -216,6 +255,12 @@ final class Controller
                 'totals' => $this->service->getTodayTotals($id),
             ];
         }
+        usort($items, fn(array $left, array $right): int => $this->compareEmployeeStatus(
+            $left['employee'],
+            $left['status'],
+            $right['employee'],
+            $right['status']
+        ));
         json_response(['ok' => true, 'items' => $items]);
     }
 

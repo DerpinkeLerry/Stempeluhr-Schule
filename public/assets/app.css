@@ -2695,3 +2695,97 @@ textarea {
         box-shadow: none !important;
     }
 }
+
+/* Employee settings cards */
+.employee-settings-row {
+    --bs-gutter-x: 2rem;
+    --bs-gutter-y: 2rem;
+}
+
+.employee-settings-card {
+    border-color: #dbe2eb;
+    box-shadow: 0 16px 46px rgba(21, 37, 65, .08);
+}
+
+.employee-settings-card .section-heading {
+    padding: 1.6rem 1.75rem 1.35rem;
+    background: linear-gradient(180deg, #fff 0%, #fbfcfe 100%);
+}
+
+.employee-settings-body {
+    padding: 1.5rem 1.75rem 1.75rem;
+}
+
+.vacation-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .9rem;
+    margin-bottom: 1.35rem;
+}
+
+.vacation-summary-grid .stat-card {
+    min-height: 102px;
+    padding: 1rem .8rem;
+    box-shadow: none;
+}
+
+.vacation-summary-grid .stat-card:hover {
+    transform: none;
+    border-color: var(--wepro-line-strong);
+    box-shadow: 0 10px 26px rgba(21, 37, 65, .06);
+}
+
+.employee-settings-form-section,
+.schedule-effective-row {
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--wepro-line);
+}
+
+.schedule-days-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: .75rem;
+}
+
+.schedule-days-grid > div {
+    min-width: 0;
+}
+
+.schedule-effective-row {
+    margin-top: 1.25rem;
+}
+
+@media (max-width: 767.98px) {
+    .employee-settings-card .section-heading,
+    .employee-settings-body {
+        padding-right: 1.25rem;
+        padding-left: 1.25rem;
+    }
+
+    .schedule-days-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 575.98px) {
+    .employee-settings-row {
+        --bs-gutter-y: 1.25rem;
+    }
+
+    .vacation-summary-grid {
+        gap: .6rem;
+    }
+
+    .vacation-summary-grid .stat-card {
+        min-height: 92px;
+        padding: .85rem .5rem;
+    }
+
+    .vacation-summary-grid .stat-card strong {
+        font-size: 1.45rem;
+    }
+
+    .schedule-days-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

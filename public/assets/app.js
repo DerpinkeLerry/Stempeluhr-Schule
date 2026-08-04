@@ -224,6 +224,7 @@
             const result = await response.json();
             if (!result?.ok) return;
 
+            const tableBody = table.tBodies[0];
             result.items.forEach(item => {
                 const state = {...item, syncedAt: Date.now()};
                 dashboardState.set(item.employee.id, state);
@@ -231,6 +232,7 @@
                 if (!row) return;
                 const statusCell = row.querySelector('.status-cell');
                 if (statusCell) statusCell.innerHTML = statusHtml(item.status);
+                if (tableBody) tableBody.appendChild(row);
             });
             tickDashboard();
         } catch (_) {
