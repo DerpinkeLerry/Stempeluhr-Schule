@@ -5,6 +5,7 @@ require_once __DIR__ . '/../app/helpers.php';
 require_once __DIR__ . '/../app/db.php';
 require_once __DIR__ . '/../app/TimeClockService.php';
 require_once __DIR__ . '/../app/SimplePdf.php';
+require_once __DIR__ . '/../app/TimeReportPdfRenderer.php';
 require_once __DIR__ . '/../app/Controller.php';
 
 start_session();
@@ -89,6 +90,9 @@ switch ($path) {
         break;
     case '/api/absence/delete':
         $controller->apiAbsenceDelete();
+        break;
+    case '/reports/time.pdf':
+        $controller->timeReportPdf();
         break;
     case '/reports/week.pdf':
         $controller->weekReportPdf();

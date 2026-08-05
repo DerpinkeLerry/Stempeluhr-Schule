@@ -1329,22 +1329,114 @@ final class TimeClockService
 
     public function getCurrentWeekInfo(): array
     {
-        $timezone = new DateTimeZone('Europe/Berlin');
-        $now = $this->now()->setTimezone($timezone);
-        $start = $now->setTime(0, 0)->modify('-' . ((int)$now->format('N') - 1) . ' days');
-        $end = $start->modify('+6 days');
-
+        $period = self::reportPeriod('week');
         return [
+            'start_date' => $period['start_date'],
+            'end_date' => $period['end_date'],
+            'start_label' => $period['start_label'],
+            'end_label' => $period['end_label'],
+            'week' => $period['week'],
+            'year' => $period['year'],
+        ];
+    }
+
+    public static function reportPeriod(string $type, string $reference = '', ?DateTimeImmutable $now = null): array
+    {
+        $timezone = new DateTimeZone('Europe/Berlin');
+        $now = ($now ?? new DateTimeImmutable('now', $timezone))->setTimezone($timezone);
+        $type = strtolower(trim($type));
+        if (!in_array($type, ['week', 'month', 'year'], true)) {
+            throw new RuntimeException('Der Zeitraumtyp ist ungültig');
+        }
+
+        if ($type === 'week') {
+            $reference = trim($reference) !== '' ? trim($reference) : $now->format('o-\WW');
+            if (!preg_match('/^(\d{4})-W(\d{2})$/', $reference, $matches)) {
+                throw new RuntimeException('Die Kalenderwoche ist ungültig');
+            }
+            $year = (int)$matches[1];
+            $week = (int)$matches[2];
+            if ($year < 1970 || $year > 2200 || $week < 1 || $week > 53) {
+                throw new RuntimeException('Die Kalenderwoche ist ungültig');
+            }
+            $start = (new DateTimeImmutable('now', $timezone))->setISODate($year, $week)->setTime(0, 0);
+            if ($start->format('o-\WW') !== sprintf('%04d-W%02d', $year, $week)) {
+                throw new RuntimeException('Die Kalenderwoche existiert nicht');
+            }
+            $end = $start->modify('+6 days');
+            return [
+                'type' => 'week',
+                'reference' => sprintf('%04d-W%02d', $year, $week),
+                'start_date' => $start->format('Y-m-d'),
+                'end_date' => $end->format('Y-m-d'),
+                'start_label' => $start->format('d.m.Y'),
+                'end_label' => $end->format('d.m.Y'),
+                'range_label' => $start->format('d.m.Y') . ' bis ' . $end->format('d.m.Y'),
+                'title' => 'KW ' . sprintf('%02d', $week) . ' / ' . $year,
+                'filename' => sprintf('Arbeitszeiten_KW_%02d_%d.pdf', $week, $year),
+                'week' => $week,
+                'year' => $year,
+            ];
+        }
+
+        if ($type === 'month') {
+            $reference = trim($reference) !== '' ? trim($reference) : $now->format('Y-m');
+            if (!preg_match('/^(\d{4})-(\d{2})$/', $reference, $matches)) {
+                throw new RuntimeException('Der Monat ist ungültig');
+            }
+            $year = (int)$matches[1];
+            $month = (int)$matches[2];
+            if ($year < 1970 || $year > 2200 || $month < 1 || $month > 12) {
+                throw new RuntimeException('Der Monat ist ungültig');
+            }
+            $start = new DateTimeImmutable(sprintf('%04d-%02d-01 00:00:00', $year, $month), $timezone);
+            $end = $start->modify('last day of this month');
+            $monthName = self::germanMonthName($month);
+            return [
+                'type' => 'month',
+                'reference' => sprintf('%04d-%02d', $year, $month),
+                'start_date' => $start->format('Y-m-d'),
+                'end_date' => $end->format('Y-m-d'),
+                'start_label' => $start->format('d.m.Y'),
+                'end_label' => $end->format('d.m.Y'),
+                'range_label' => $start->format('d.m.Y') . ' bis ' . $end->format('d.m.Y'),
+                'title' => $monthName . ' ' . $year,
+                'filename' => sprintf('Arbeitszeiten_Monat_%04d-%02d.pdf', $year, $month),
+                'month' => $month,
+                'year' => $year,
+            ];
+        }
+
+        $reference = trim($reference) !== '' ? trim($reference) : $now->format('Y');
+        if (!preg_match('/^\d{4}$/', $reference)) {
+            throw new RuntimeException('Das Jahr ist ungültig');
+        }
+        $year = (int)$reference;
+        if ($year < 1970 || $year > 2200) {
+            throw new RuntimeException('Das Jahr ist ungültig');
+        }
+        $start = new DateTimeImmutable(sprintf('%04d-01-01 00:00:00', $year), $timezone);
+        $end = new DateTimeImmutable(sprintf('%04d-12-31 00:00:00', $year), $timezone);
+        return [
+            'type' => 'year',
+            'reference' => (string)$year,
             'start_date' => $start->format('Y-m-d'),
             'end_date' => $end->format('Y-m-d'),
             'start_label' => $start->format('d.m.Y'),
             'end_label' => $end->format('d.m.Y'),
-            'week' => (int)$start->format('W'),
-            'year' => (int)$start->format('o'),
+            'range_label' => $start->format('d.m.Y') . ' bis ' . $end->format('d.m.Y'),
+            'title' => 'Kalenderjahr ' . $year,
+            'filename' => sprintf('Arbeitszeiten_Jahr_%d.pdf', $year),
+            'year' => $year,
         ];
     }
 
     public function buildWeekReport(array $employeeIds): array
+    {
+        return $this->buildTimeReport($employeeIds, 'week');
+    }
+
+    public function buildTimeReport(array $employeeIds, string $type, string $reference = ''): array
     {
         $employeeIds = array_values(array_unique(array_filter(array_map('intval', $employeeIds), static fn(int $id): bool => $id > 0)));
         if (!$employeeIds) {
@@ -1354,6 +1446,7 @@ final class TimeClockService
             throw new RuntimeException('Es wurden zu viele Mitarbeiter ausgewählt');
         }
 
+        $period = self::reportPeriod($type, $reference);
         $marks = implode(',', array_fill(0, count($employeeIds), '?'));
         $st = $this->pdo->prepare("SELECT * FROM employee WHERE id IN ($marks) ORDER BY name");
         $st->execute($employeeIds);
@@ -1362,156 +1455,313 @@ final class TimeClockService
             throw new RuntimeException('Keine Mitarbeiter gefunden');
         }
 
-        $week = $this->getCurrentWeekInfo();
         $reportTimezone = new DateTimeZone('Europe/Berlin');
-        $utc = new DateTimeZone('UTC');
-        $weekStart = new DateTimeImmutable($week['start_date'] . ' 00:00:00', $reportTimezone);
-        $weekEnd = $weekStart->modify('+7 days');
-        $rangeStart = $weekStart->setTimezone($utc)->format('Y-m-d H:i:s');
-        $rangeEnd = $weekEnd->setTimezone($utc)->format('Y-m-d H:i:s');
-        $nowUtc = $this->nowUtc();
-        $dayNames = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-        $absenceLabels = ['VACATION' => 'Urlaub', 'SICK' => 'Krank', 'SCHOOL' => 'Schule', 'OTHER' => 'Sonstiges'];
+        $periodStart = new DateTimeImmutable($period['start_date'] . ' 00:00:00', $reportTimezone);
+        $periodEndExclusive = (new DateTimeImmutable($period['end_date'] . ' 00:00:00', $reportTimezone))->modify('+1 day');
         $reports = [];
-
         foreach ($employees as $employee) {
-            $employeeId = (int)$employee['id'];
-            $sessionsSt = $this->pdo->prepare('SELECT * FROM work_session WHERE employee_id=? AND started_at < ? AND COALESCE(ended_at, ?) > ? ORDER BY started_at');
-            $sessionsSt->execute([$employeeId, $rangeEnd, $nowUtc, $rangeStart]);
-            $sessions = $sessionsSt->fetchAll();
-
-            $breaksBySession = [];
-            if ($sessions) {
-                $sessionIds = array_map(static fn(array $row): int => (int)$row['id'], $sessions);
-                $sessionMarks = implode(',', array_fill(0, count($sessionIds), '?'));
-                $breakSt = $this->pdo->prepare("SELECT * FROM break_session WHERE work_session_id IN ($sessionMarks) ORDER BY started_at");
-                $breakSt->execute($sessionIds);
-                foreach ($breakSt->fetchAll() as $break) {
-                    $breaksBySession[(int)$break['work_session_id']][] = $break;
-                }
-            }
-
-            $absenceSt = $this->pdo->prepare('SELECT * FROM absence WHERE employee_id=? AND start_date<=? AND end_date>=? ORDER BY start_date, id');
-            $absenceSt->execute([$employeeId, $week['end_date'], $week['start_date']]);
-            $absences = $absenceSt->fetchAll();
-            $days = [];
-            $weekWork = 0;
-            $weekBreak = 0;
-            $weekPlanned = 0;
-
-            for ($i = 0; $i < 7; $i++) {
-                $dayStart = $weekStart->modify('+' . $i . ' days');
-                $dayEnd = $dayStart->modify('+1 day');
-                $date = $dayStart->format('Y-m-d');
-                $dayStartUtc = $dayStart->setTimezone($utc)->format('Y-m-d H:i:s');
-                $dayEndUtc = $dayEnd->setTimezone($utc)->format('Y-m-d H:i:s');
-                $plannedSeconds = $this->getScheduledMinutesForDate($employeeId, $date) * 60;
-                $firstStart = null;
-                $lastEnd = null;
-                $hasOpenSession = false;
-                $hasWorkSession = false;
-                $workSeconds = 0;
-                $breakSeconds = 0;
-
-                foreach ($sessions as $session) {
-                    $sessionEnd = $this->effectiveSessionEndUtc($session, $employee['timezone'], $nowUtc);
-                    $seconds = $this->overlapSeconds($session['started_at'], $sessionEnd, $dayStartUtc, $dayEndUtc);
-                    if ($seconds < 1) {
-                        continue;
-                    }
-                    $hasWorkSession = true;
-                    $workSeconds += $seconds;
-
-                    $startTs = max(strtotime($session['started_at'] . ' UTC'), strtotime($dayStartUtc . ' UTC'));
-                    $endTs = min(strtotime($sessionEnd . ' UTC'), strtotime($dayEndUtc . ' UTC'));
-                    $firstStart = $firstStart === null ? $startTs : min($firstStart, $startTs);
-                    $lastEnd = $lastEnd === null ? $endTs : max($lastEnd, $endTs);
-                    if (!$session['ended_at'] && !$this->isStaleWorkSession($session, $employee['timezone']) && $endTs === strtotime($nowUtc . ' UTC')) {
-                        $hasOpenSession = true;
-                    }
-
-                    foreach ($breaksBySession[(int)$session['id']] ?? [] as $break) {
-                        $breakEnd = $break['ended_at'] ?: $sessionEnd;
-                        if ($breakEnd > $sessionEnd) {
-                            $breakEnd = $sessionEnd;
-                        }
-                        $breakSeconds += $this->overlapSeconds($break['started_at'], $breakEnd, $dayStartUtc, $dayEndUtc);
-                    }
-                }
-
-                $workSeconds = self::calculateNetSeconds($workSeconds, $breakSeconds);
-                $noteParts = [];
-                $absenceType = null;
-                $absenceCredit = 0;
-
-                foreach ($absences as $absence) {
-                    if ($absence['start_date'] > $date || $absence['end_date'] < $date) {
-                        continue;
-                    }
-                    $absenceType ??= (string)$absence['type'];
-                    $label = $absenceLabels[$absence['type']] ?? 'Abwesend';
-                    $portion = (string)($absence['portion'] ?? 'FULL');
-                    if ($portion === 'AM') {
-                        $label .= ' vormittags';
-                    } elseif ($portion === 'PM') {
-                        $label .= ' nachmittags';
-                    }
-                    $noteParts[] = $label;
-
-                    if (!in_array($absence['type'], ['VACATION', 'SICK'], true)) {
-                        continue;
-                    }
-                    if ($absence['credit_minutes_override'] !== null) {
-                        $credit = (int)$absence['credit_minutes_override'] * 60;
-                    } elseif ($portion === 'FULL') {
-                        $credit = $plannedSeconds;
-                    } else {
-                        $credit = (int)round($plannedSeconds / 2);
-                    }
-                    if ($portion === 'FULL' && $hasWorkSession) {
-                        $credit = 0;
-                    }
-                    $absenceCredit = max($absenceCredit, $credit);
-                }
-
-                $holidayCredit = 0;
-                if (!$hasWorkSession && $absenceType === null && !(int)$employee['special_time'] && $this->isHoliday((string)$employee['holiday_region'], $date)) {
-                    $holidayCredit = $plannedSeconds;
-                    $noteParts[] = 'Feiertag';
-                }
-
-                $workSeconds += max($absenceCredit, $holidayCredit);
-                $days[] = [
-                    'day' => $dayNames[$i],
-                    'date' => $dayStart->format('d.m.Y'),
-                    'start' => $firstStart === null ? '-' : (new DateTimeImmutable('@' . $firstStart))->setTimezone($reportTimezone)->format('H:i'),
-                    'end' => $lastEnd === null ? '-' : ($hasOpenSession ? 'offen' : (new DateTimeImmutable('@' . $lastEnd))->setTimezone($reportTimezone)->format('H:i')),
-                    'break_seconds' => $breakSeconds,
-                    'work_seconds' => $workSeconds,
-                    'planned_seconds' => $plannedSeconds,
-                    'note' => implode(', ', array_unique($noteParts)),
-                    'absence_type' => $absenceType,
-                ];
-                $weekWork += $workSeconds;
-                $weekBreak += $breakSeconds;
-                $weekPlanned += $plannedSeconds;
-            }
-
-            $reports[] = [
-                'employee' => $employee,
-                'days' => $days,
-                'work_seconds' => $weekWork,
-                'break_seconds' => $weekBreak,
-                'planned_seconds' => $weekPlanned,
-                'difference_seconds' => $weekWork - $weekPlanned,
-            ];
+            $reports[] = $this->buildEmployeeTimeReport($employee, $periodStart, $periodEndExclusive, $period['type']);
         }
 
         return [
-            'week' => $week,
+            'type' => $period['type'],
+            'period' => $period,
             'employees' => $reports,
             'created_at' => $this->now()->setTimezone($reportTimezone)->format('d.m.Y H:i'),
         ];
+    }
+
+    private function buildEmployeeTimeReport(
+        array $employee,
+        DateTimeImmutable $periodStart,
+        DateTimeImmutable $periodEndExclusive,
+        string $reportType
+    ): array {
+        $employeeId = (int)$employee['id'];
+        $reportTimezone = new DateTimeZone('Europe/Berlin');
+        $utc = new DateTimeZone('UTC');
+        $rangeStart = $periodStart->setTimezone($utc)->format('Y-m-d H:i:s');
+        $rangeEnd = $periodEndExclusive->setTimezone($utc)->format('Y-m-d H:i:s');
+        $nowUtc = $this->nowUtc();
+
+        $sessionsSt = $this->pdo->prepare(
+            'SELECT * FROM work_session WHERE employee_id=? AND started_at < ? AND COALESCE(ended_at, ?) > ? ORDER BY started_at'
+        );
+        $sessionsSt->execute([$employeeId, $rangeEnd, $nowUtc, $rangeStart]);
+        $sessions = $sessionsSt->fetchAll();
+
+        $breaksBySession = [];
+        if ($sessions) {
+            $sessionIds = array_map(static fn(array $row): int => (int)$row['id'], $sessions);
+            $sessionMarks = implode(',', array_fill(0, count($sessionIds), '?'));
+            $breakSt = $this->pdo->prepare("SELECT * FROM break_session WHERE work_session_id IN ($sessionMarks) ORDER BY started_at");
+            $breakSt->execute($sessionIds);
+            foreach ($breakSt->fetchAll() as $break) {
+                $breaksBySession[(int)$break['work_session_id']][] = $break;
+            }
+        }
+
+        $startDate = $periodStart->format('Y-m-d');
+        $endDate = $periodEndExclusive->modify('-1 day')->format('Y-m-d');
+        $absenceSt = $this->pdo->prepare(
+            'SELECT * FROM absence WHERE employee_id=? AND start_date<=? AND end_date>=? ORDER BY start_date, id'
+        );
+        $absenceSt->execute([$employeeId, $endDate, $startDate]);
+        $absences = $absenceSt->fetchAll();
+
+        $scheduleRows = $this->loadScheduleRowsForPeriod($employeeId, $startDate, $endDate);
+        $holidayRows = $this->loadHolidaysForPeriod((string)$employee['holiday_region'], $startDate, $endDate);
+        $dayNames = [1 => 'Mo', 2 => 'Di', 3 => 'Mi', 4 => 'Do', 5 => 'Fr', 6 => 'Sa', 7 => 'So'];
+        $absenceLabels = ['VACATION' => 'Urlaub', 'SICK' => 'Krank', 'SCHOOL' => 'Schule', 'OTHER' => 'Sonstiges'];
+
+        $days = [];
+        $totals = [
+            'work_seconds' => 0,
+            'break_seconds' => 0,
+            'planned_seconds' => 0,
+            'vacation_days' => 0.0,
+            'sick_days' => 0.0,
+            'holiday_days' => 0,
+            'presence_days' => 0,
+        ];
+
+        for ($dayStart = $periodStart; $dayStart < $periodEndExclusive; $dayStart = $dayStart->modify('+1 day')) {
+            $dayEnd = $dayStart->modify('+1 day');
+            $date = $dayStart->format('Y-m-d');
+            $weekday = (int)$dayStart->format('N');
+            $isWeekend = $weekday >= 6;
+            $isHoliday = isset($holidayRows[$date]);
+            $dayStartUtc = $dayStart->setTimezone($utc)->format('Y-m-d H:i:s');
+            $dayEndUtc = $dayEnd->setTimezone($utc)->format('Y-m-d H:i:s');
+            $plannedSeconds = $this->scheduledMinutesFromRows($scheduleRows, $weekday, $date) * 60;
+            $firstStart = null;
+            $lastEnd = null;
+            $hasOpenSession = false;
+            $hasWorkSession = false;
+            $grossSeconds = 0;
+            $breakSeconds = 0;
+
+            foreach ($sessions as $session) {
+                $sessionEnd = $this->effectiveSessionEndUtc($session, (string)$employee['timezone'], $nowUtc);
+                $seconds = $this->overlapSeconds((string)$session['started_at'], $sessionEnd, $dayStartUtc, $dayEndUtc);
+                if ($seconds < 1) {
+                    continue;
+                }
+                $hasWorkSession = true;
+                $grossSeconds += $seconds;
+
+                $startTs = max(strtotime($session['started_at'] . ' UTC'), strtotime($dayStartUtc . ' UTC'));
+                $endTs = min(strtotime($sessionEnd . ' UTC'), strtotime($dayEndUtc . ' UTC'));
+                $firstStart = $firstStart === null ? $startTs : min($firstStart, $startTs);
+                $lastEnd = $lastEnd === null ? $endTs : max($lastEnd, $endTs);
+                if (!$session['ended_at'] && !$this->isStaleWorkSession($session, (string)$employee['timezone']) && $endTs === strtotime($nowUtc . ' UTC')) {
+                    $hasOpenSession = true;
+                }
+
+                foreach ($breaksBySession[(int)$session['id']] ?? [] as $break) {
+                    $breakEnd = $break['ended_at'] ?: $sessionEnd;
+                    if ($breakEnd > $sessionEnd) {
+                        $breakEnd = $sessionEnd;
+                    }
+                    $breakSeconds += $this->overlapSeconds((string)$break['started_at'], (string)$breakEnd, $dayStartUtc, $dayEndUtc);
+                }
+            }
+
+            $recordedWorkSeconds = self::calculateNetSeconds($grossSeconds, $breakSeconds);
+            $workSeconds = $recordedWorkSeconds;
+            $noteParts = [];
+            $absenceType = null;
+            $absenceCredit = 0;
+            $vacationFraction = 0.0;
+            $sickFraction = 0.0;
+
+            foreach ($absences as $absence) {
+                if ($absence['start_date'] > $date || $absence['end_date'] < $date) {
+                    continue;
+                }
+                $absenceType ??= (string)$absence['type'];
+                $label = $absenceLabels[$absence['type']] ?? 'Abwesend';
+                $portion = (string)($absence['portion'] ?? 'FULL');
+                if ($portion === 'AM') {
+                    $label .= ' vormittags';
+                } elseif ($portion === 'PM') {
+                    $label .= ' nachmittags';
+                }
+                $noteParts[] = $label;
+
+                $fraction = $portion === 'FULL' ? 1.0 : 0.5;
+                if (!$isWeekend && !$isHoliday && $plannedSeconds > 0) {
+                    if ($absence['type'] === 'VACATION') {
+                        $vacationFraction = max($vacationFraction, $fraction);
+                    } elseif ($absence['type'] === 'SICK') {
+                        $sickFraction = max($sickFraction, $fraction);
+                    }
+                }
+
+                if (!in_array($absence['type'], ['VACATION', 'SICK'], true)) {
+                    continue;
+                }
+                if ($absence['credit_minutes_override'] !== null) {
+                    $credit = (int)$absence['credit_minutes_override'] * 60;
+                } elseif ($portion === 'FULL') {
+                    $credit = $plannedSeconds;
+                } else {
+                    $credit = (int)round($plannedSeconds / 2);
+                }
+                if ($portion === 'FULL' && $hasWorkSession) {
+                    $credit = 0;
+                }
+                $absenceCredit = max($absenceCredit, $credit);
+            }
+
+            $holidayCredit = 0;
+            $holidayDay = 0;
+            if (!$hasWorkSession && $absenceType === null && !(int)$employee['special_time'] && $isHoliday) {
+                $holidayCredit = $plannedSeconds;
+                $holidayDay = $plannedSeconds > 0 ? 1 : 0;
+                $noteParts[] = (string)$holidayRows[$date];
+            }
+
+            $workSeconds += max($absenceCredit, $holidayCredit);
+            $differenceSeconds = $workSeconds - $plannedSeconds;
+            $presenceDay = $recordedWorkSeconds > 0 ? 1 : 0;
+            $day = [
+                'date_iso' => $date,
+                'day' => $dayNames[$weekday],
+                'date' => $dayStart->format('d.m.Y'),
+                'date_short' => $dayStart->format('d.m.'),
+                'month' => (int)$dayStart->format('n'),
+                'start' => $firstStart === null ? '-' : (new DateTimeImmutable('@' . $firstStart))->setTimezone($reportTimezone)->format('H:i'),
+                'end' => $lastEnd === null ? '-' : ($hasOpenSession ? 'offen' : (new DateTimeImmutable('@' . $lastEnd))->setTimezone($reportTimezone)->format('H:i')),
+                'break_seconds' => $breakSeconds,
+                'recorded_work_seconds' => $recordedWorkSeconds,
+                'work_seconds' => $workSeconds,
+                'planned_seconds' => $plannedSeconds,
+                'difference_seconds' => $differenceSeconds,
+                'note' => implode(', ', array_unique($noteParts)),
+                'absence_type' => $absenceType,
+                'vacation_days' => $vacationFraction,
+                'sick_days' => $sickFraction,
+                'holiday_days' => $holidayDay,
+                'presence_days' => $presenceDay,
+                'is_weekend' => $isWeekend,
+                'is_holiday' => $isHoliday,
+            ];
+            $days[] = $day;
+
+            $totals['work_seconds'] += $workSeconds;
+            $totals['break_seconds'] += $breakSeconds;
+            $totals['planned_seconds'] += $plannedSeconds;
+            $totals['vacation_days'] += $vacationFraction;
+            $totals['sick_days'] += $sickFraction;
+            $totals['holiday_days'] += $holidayDay;
+            $totals['presence_days'] += $presenceDay;
+        }
+
+        $months = [];
+        if ($reportType === 'year') {
+            for ($month = 1; $month <= 12; $month++) {
+                $months[$month] = [
+                    'month' => $month,
+                    'name' => self::germanMonthName($month),
+                    'work_seconds' => 0,
+                    'break_seconds' => 0,
+                    'planned_seconds' => 0,
+                    'difference_seconds' => 0,
+                    'vacation_days' => 0.0,
+                    'sick_days' => 0.0,
+                    'holiday_days' => 0,
+                    'presence_days' => 0,
+                ];
+            }
+            foreach ($days as $day) {
+                $month = (int)$day['month'];
+                $months[$month]['work_seconds'] += (int)$day['work_seconds'];
+                $months[$month]['break_seconds'] += (int)$day['break_seconds'];
+                $months[$month]['planned_seconds'] += (int)$day['planned_seconds'];
+                $months[$month]['vacation_days'] += (float)$day['vacation_days'];
+                $months[$month]['sick_days'] += (float)$day['sick_days'];
+                $months[$month]['holiday_days'] += (int)$day['holiday_days'];
+                $months[$month]['presence_days'] += (int)$day['presence_days'];
+            }
+            foreach ($months as &$month) {
+                $month['difference_seconds'] = $month['work_seconds'] - $month['planned_seconds'];
+            }
+            unset($month);
+            $months = array_values($months);
+        }
+
+        return [
+            'employee' => $employee,
+            'days' => $days,
+            'months' => $months,
+            'work_seconds' => $totals['work_seconds'],
+            'break_seconds' => $totals['break_seconds'],
+            'planned_seconds' => $totals['planned_seconds'],
+            'difference_seconds' => $totals['work_seconds'] - $totals['planned_seconds'],
+            'vacation_days' => $totals['vacation_days'],
+            'sick_days' => $totals['sick_days'],
+            'holiday_days' => $totals['holiday_days'],
+            'presence_days' => $totals['presence_days'],
+        ];
+    }
+
+    private function loadScheduleRowsForPeriod(int $employeeId, string $startDate, string $endDate): array
+    {
+        $st = $this->pdo->prepare(
+            'SELECT id, weekday, target_minutes, valid_from, valid_to
+             FROM employee_schedule
+             WHERE employee_id=? AND valid_from<=? AND (valid_to IS NULL OR valid_to>=?)
+             ORDER BY weekday, valid_from DESC, id DESC'
+        );
+        $st->execute([$employeeId, $endDate, $startDate]);
+        $rows = [];
+        foreach ($st->fetchAll() as $row) {
+            $rows[(int)$row['weekday']][] = $row;
+        }
+        return $rows;
+    }
+
+    private function scheduledMinutesFromRows(array $rows, int $weekday, string $date): int
+    {
+        foreach ($rows[$weekday] ?? [] as $row) {
+            if ((string)$row['valid_from'] <= $date && ($row['valid_to'] === null || (string)$row['valid_to'] >= $date)) {
+                return (int)$row['target_minutes'];
+            }
+        }
+        return (int)$this->getWorkRule($weekday)['default_target_minutes'];
+    }
+
+    private function loadHolidaysForPeriod(string $region, string $startDate, string $endDate): array
+    {
+        $region = trim($region) !== '' ? trim($region) : (string)cfg('default_holiday_region', 'DE-BY-KF');
+        $st = $this->pdo->prepare(
+            'SELECT day, name FROM public_holiday WHERE region=? AND day>=? AND day<=? ORDER BY day'
+        );
+        $st->execute([$region, $startDate, $endDate]);
+        $holidays = [];
+        foreach ($st->fetchAll() as $holiday) {
+            $holidays[(string)$holiday['day']] = (string)$holiday['name'];
+        }
+        return $holidays;
+    }
+
+    private static function germanMonthName(int $month): string
+    {
+        return [
+            1 => 'Januar',
+            2 => 'Februar',
+            3 => 'März',
+            4 => 'April',
+            5 => 'Mai',
+            6 => 'Juni',
+            7 => 'Juli',
+            8 => 'August',
+            9 => 'September',
+            10 => 'Oktober',
+            11 => 'November',
+            12 => 'Dezember',
+        ][$month] ?? '';
     }
 
     public function listHolidaysForYear(string $region, int $year): array

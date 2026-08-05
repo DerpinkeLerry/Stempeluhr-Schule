@@ -16,7 +16,7 @@ declare(strict_types=1);
             </div>
             <div class="login-features">
                 <div><span>01</span><p><strong>Einfach stempeln</strong>Arbeitsbeginn, Pause und Feierabend mit einem Klick.</p></div>
-                <div><span>02</span><p><strong>Alles im Blick</strong>Live-Status, Arbeitszeiten und Wochenzettel zentral verwalten.</p></div>
+                <div><span>02</span><p><strong>Alles im Blick</strong>Live-Status, Arbeitszeiten und Zeitnachweise zentral verwalten.</p></div>
                 <div><span>03</span><p><strong>Sicher organisiert</strong>Klare Rollen, lokale Zeitzonen und nachvollziehbare Einträge.</p></div>
             </div>
         </div>

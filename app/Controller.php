@@ -646,7 +646,7 @@ final class Controller
         }
     }
 
-    public function weekReportPdf(): never
+    public function timeReportPdf(): never
     {
         require_post();
         verify_csrf();
@@ -654,14 +654,17 @@ final class Controller
 
         try {
             $ids = $_POST['employee_ids'] ?? [];
-            $report = $this->service->buildWeekReport(is_array($ids) ? $ids : []);
-            $pdf = new SimplePdf();
-            $total = count($report['employees']);
-            foreach ($report['employees'] as $index => $employeeReport) {
-                $this->drawWeekReport($pdf, $report, $employeeReport, $index + 1, $total);
-            }
-            $file = sprintf('Arbeitszeiten_KW_%02d_%d.pdf', $report['week']['week'], $report['week']['year']);
-            $data = $pdf->build();
+            $type = strtolower(trim((string)($_POST['report_type'] ?? 'week')));
+            $reference = match ($type) {
+                'month' => (string)($_POST['report_month'] ?? ''),
+                'year' => (string)($_POST['report_year'] ?? ''),
+                default => (string)($_POST['report_week'] ?? ''),
+            };
+            $report = $this->service->buildTimeReport(is_array($ids) ? $ids : [], $type, $reference);
+            $renderer = new TimeReportPdfRenderer();
+            $data = $renderer->render($report);
+            $file = preg_replace('/[^A-Za-z0-9._-]+/', '_', (string)$report['period']['filename']) ?: 'Arbeitszeiten.pdf';
+
             header('Content-Type: application/pdf');
             header('Content-Disposition: inline; filename="' . $file . '"');
             header('Content-Length: ' . strlen($data));
@@ -679,121 +682,10 @@ final class Controller
         }
     }
 
-    private function drawWeekReport(SimplePdf $pdf, array $report, array $employeeReport, int $page, int $total): void
+    public function weekReportPdf(): never
     {
-        $pdf->newPage();
-        $week = $report['week'];
-        $employee = $employeeReport['employee'];
-
-        $pdf->text(35, 48, 18, 'Arbeitszeitnachweis', true);
-        $pdf->text(35, 76, 11, 'Mitarbeiter: ' . $employee['name'], true);
-        $meta = [];
-        if (!empty($employee['personnel_number'])) $meta[] = 'Personalnr.: ' . $employee['personnel_number'];
-        if (!empty($employee['department'])) $meta[] = 'Abteilung: ' . $employee['department'];
-        $pdf->text(35, 94, 9, implode(' | ', $meta));
-        $pdf->text(35, 110, 10, 'Kalenderwoche: KW ' . sprintf('%02d', $week['week']) . ' / ' . $week['year']);
-        $pdf->text(35, 127, 10, 'Zeitraum: ' . $week['start_label'] . ' bis ' . $week['end_label']);
-        $pdf->text(405, 96, 8, 'Erstellt: ' . $report['created_at']);
-
-        $left = 35.0;
-        $top = 158.0;
-        $rowHeight = 34.0;
-        $widths = [42.0, 62.0, 55.0, 55.0, 58.0, 72.0, 181.0];
-        $headers = ['Tag', 'Datum', 'Beginn', 'Ende', 'Pause', 'Arbeitszeit', 'Bemerkung'];
-        $tableWidth = array_sum($widths);
-        $tableHeight = $rowHeight * 8;
-
-        $pdf->rect($left, $top, $tableWidth, $rowHeight, true, 0.90);
-
-        foreach ($employeeReport['days'] as $rowIndex => $day) {
-            $color = match ($day['absence_type'] ?? null) {
-                'SICK' => [1.00, 0.96, 0.72],
-                'VACATION' => [0.82, 0.91, 1.00],
-                'SCHOOL', 'OTHER' => [0.86, 0.95, 0.86],
-                default => null,
-            };
-            if ($color !== null) {
-                $rowTop = $top + $rowHeight * ($rowIndex + 1);
-                $pdf->rectColor($left, $rowTop, $tableWidth, $rowHeight, $color[0], $color[1], $color[2]);
-            }
-        }
-
-        $pdf->rect($left, $top, $tableWidth, $tableHeight);
-        for ($i = 1; $i < 8; $i++) {
-            $pdf->line($left, $top + $rowHeight * $i, $left + $tableWidth, $top + $rowHeight * $i);
-        }
-
-        $x = $left;
-        foreach ($widths as $width) {
-            $pdf->line($x, $top, $x, $top + $tableHeight);
-            $x += $width;
-        }
-        $pdf->line($left + $tableWidth, $top, $left + $tableWidth, $top + $tableHeight);
-
-        $x = $left;
-        foreach ($headers as $i => $header) {
-            $pdf->text($x + 4, $top + 21, 8.5, $header, true);
-            $x += $widths[$i];
-        }
-
-        foreach ($employeeReport['days'] as $rowIndex => $day) {
-            $values = [
-                $day['day'],
-                $day['date'],
-                $day['start'],
-                $day['end'],
-                $this->pdfDuration((int)$day['break_seconds']),
-                $this->pdfDuration((int)$day['work_seconds']),
-                $this->shortPdfText((string)$day['note'], 34),
-            ];
-            $x = $left;
-            $textTop = $top + $rowHeight * ($rowIndex + 1) + 21;
-            foreach ($values as $i => $value) {
-                $pdf->text($x + 4, $textTop, 8.5, $value === '' ? '-' : $value);
-                $x += $widths[$i];
-            }
-        }
-
-        $summaryTop = $top + $tableHeight + 28;
-        $pdf->rect(300, $summaryTop, 260, 82, true, 0.94);
-        $pdf->rect(300, $summaryTop, 260, 82);
-        $pdf->text(312, $summaryTop + 20, 9, 'Sollzeit:', true);
-        $pdf->text(495, $summaryTop + 20, 9, $this->pdfDuration((int)$employeeReport['planned_seconds']), true);
-        $pdf->text(312, $summaryTop + 40, 9, 'Arbeitszeit:', true);
-        $pdf->text(495, $summaryTop + 40, 9, $this->pdfDuration((int)$employeeReport['work_seconds']), true);
-        $pdf->text(312, $summaryTop + 60, 9, 'Differenz:', true);
-        $pdf->text(495, $summaryTop + 60, 9, $this->pdfSignedDuration((int)$employeeReport['difference_seconds']), true);
-        $pdf->text(312, $summaryTop + 78, 8, 'Pausen: ' . $this->pdfDuration((int)$employeeReport['break_seconds']));
-
-        $pdf->text(35, 565, 10, 'Die oben aufgeführten Arbeitszeiten wurden geprüft.');
-        $pdf->line(120, 675, 560, 675);
-        $pdf->text(120, 691, 8.5, 'Unterschrift Arbeitnehmer');
-        $pdf->text(35, 810, 8, 'Stempeluhr - Wochenzettel');
-        $pdf->text(495, 810, 8, 'Seite ' . $page . ' von ' . $total);
-    }
-
-    private function pdfDuration(int $seconds): string
-    {
-        $seconds = max(0, $seconds);
-        return sprintf('%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60));
-    }
-
-    private function pdfSignedDuration(int $seconds): string
-    {
-        $sign = $seconds < 0 ? '-' : '+';
-        return $sign . $this->pdfDuration(abs($seconds));
-    }
-
-    private function shortPdfText(string $text, int $length): string
-    {
-        if (function_exists('mb_strlen') && function_exists('mb_substr')) {
-            return mb_strlen($text) > $length ? mb_substr($text, 0, $length - 3) . '...' : $text;
-        }
-        $chars = preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY);
-        if (is_array($chars) && count($chars) > $length) {
-            return implode('', array_slice($chars, 0, $length - 3)) . '...';
-        }
-        return $text;
+        $_POST['report_type'] = 'week';
+        $this->timeReportPdf();
     }
 
     private function logoutNow(): never

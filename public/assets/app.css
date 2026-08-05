@@ -57,6 +57,30 @@ body.app-login {
     background: var(--wepro-surface);
 }
 
+body.app-authenticated::before {
+    content: "";
+    position: fixed;
+    inset: 78px 0 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(circle at 24% 28%, rgba(255, 180, 50, .42), transparent 34rem),
+        radial-gradient(circle at 82% 72%, rgba(242, 164, 20, .28), transparent 38rem),
+        linear-gradient(135deg, rgba(255, 244, 220, .94), rgba(255, 221, 157, .64) 52%, rgba(244, 246, 249, .34));
+    opacity: 0;
+    transition: opacity .8s cubic-bezier(.2, .75, .25, 1);
+}
+
+body.app-authenticated.employee-on-break::before {
+    opacity: 1;
+}
+
+body.app-authenticated .app-main,
+body.app-authenticated .site-footer {
+    position: relative;
+    z-index: 1;
+}
+
 a {
     color: var(--wepro-navy-2);
     text-decoration-thickness: 1px;
@@ -1187,6 +1211,7 @@ textarea {
         var(--wepro-navy);
     color: #fff;
     box-shadow: 0 25px 65px rgba(21, 37, 65, .19);
+    transition: background .75s cubic-bezier(.2, .75, .25, 1), box-shadow .75s cubic-bezier(.2, .75, .25, 1);
 }
 
 .clock-panel::after {
@@ -1510,10 +1535,15 @@ textarea {
 }
 
 .on-break .clock-panel {
-    box-shadow: 0 25px 65px rgba(199, 131, 22, .16);
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, .08), transparent 46%),
+        linear-gradient(135deg, #8f5208 0%, #c8790d 48%, #6e4009 100%);
+    box-shadow: 0 28px 72px rgba(169, 96, 10, .3);
 }
 
 @media (prefers-reduced-motion: reduce) {
+    body.app-authenticated::before,
+    .clock-panel,
     .break-metric-current,
     .break-rest {
         transition: none;
@@ -1972,17 +2002,17 @@ textarea {
     box-shadow: none !important;
 }
 
-#weekReportModal .modal-dialog {
-    width: min(660px, calc(100% - 1.5rem));
-    max-width: 660px;
+#timeReportModal .modal-dialog {
+    width: min(760px, calc(100% - 1.5rem));
+    max-width: 760px;
     height: min(90vh, 880px);
 }
 
-#weekReportModal .modal-content {
+#timeReportModal .modal-content {
     max-height: 90vh;
 }
 
-#weekReportModal .modal-header {
+#timeReportModal .modal-header {
     position: sticky;
     top: 0;
     z-index: 3;
@@ -1991,13 +2021,185 @@ textarea {
     backdrop-filter: blur(12px);
 }
 
-#weekReportModal .modal-body {
+#timeReportModal .modal-body {
     overflow-y: auto;
     overscroll-behavior: contain;
 }
 
-.week-report-print {
+.time-report-print {
     flex: 0 0 auto;
+}
+
+.report-period-section {
+    margin-bottom: 1.35rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--wepro-line);
+}
+
+.report-section-label {
+    margin-bottom: .65rem;
+    color: var(--wepro-navy);
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+}
+
+.report-period-switch {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .65rem;
+}
+
+.report-period-option {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .7rem;
+    min-height: 74px;
+    padding: .8rem .85rem;
+    border: 1px solid var(--wepro-line);
+    border-radius: 14px;
+    background: #fff;
+    cursor: pointer;
+    transition: border-color var(--wepro-transition), background var(--wepro-transition), transform var(--wepro-transition), box-shadow var(--wepro-transition);
+}
+
+.report-period-option:hover {
+    border-color: var(--wepro-line-strong);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 22px rgba(21, 37, 65, .07);
+}
+
+.report-period-option:has(input:focus-visible) {
+    outline: 3px solid rgba(255, 180, 50, .28);
+    outline-offset: 2px;
+}
+
+.report-period-option:has(input:checked) {
+    border-color: rgba(255, 180, 50, .62);
+    background: linear-gradient(135deg, #fffaf0, #fff);
+    box-shadow: 0 9px 24px rgba(199, 131, 22, .1);
+}
+
+.report-period-option input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+}
+
+.report-period-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    background: var(--wepro-paper);
+    color: var(--wepro-navy);
+    font-size: .67rem;
+    font-weight: 700;
+    transition: background var(--wepro-transition), color var(--wepro-transition);
+}
+
+.report-period-option:has(input:checked) .report-period-icon {
+    background: var(--wepro-orange);
+    color: var(--wepro-navy);
+}
+
+.report-period-option-copy {
+    display: grid;
+    min-width: 0;
+}
+
+.report-period-option-copy strong {
+    color: var(--wepro-navy);
+    font-size: .72rem;
+    font-weight: 650;
+}
+
+.report-period-option-copy small {
+    overflow: hidden;
+    color: var(--wepro-muted);
+    font-size: .58rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.report-period-check {
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--wepro-line-strong);
+    border-radius: 50%;
+    transition: border-color var(--wepro-transition), box-shadow var(--wepro-transition);
+}
+
+.report-period-option:has(input:checked) .report-period-check {
+    border-color: var(--wepro-orange-strong);
+    box-shadow: inset 0 0 0 2px #fff, 0 0 0 1px var(--wepro-orange-strong);
+    background: var(--wepro-orange-strong);
+}
+
+.report-period-settings {
+    margin-top: .75rem;
+    padding: .85rem 1rem;
+    border: 1px solid var(--wepro-line);
+    border-radius: 14px;
+    background: var(--wepro-paper);
+}
+
+.report-period-panel {
+    display: grid;
+    grid-template-columns: minmax(170px, 220px) minmax(0, 1fr);
+    align-items: end;
+    gap: .45rem 1rem;
+}
+
+.report-period-panel[hidden] {
+    display: none;
+}
+
+.report-period-panel .form-label {
+    grid-column: 1;
+    margin: 0;
+}
+
+.report-period-panel .form-control,
+.report-period-panel .form-select {
+    grid-column: 1;
+}
+
+.report-layout-note {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    color: var(--wepro-muted);
+    font-size: .62rem;
+    line-height: 1.55;
+}
+
+.report-layout-note strong {
+    color: var(--wepro-navy-3);
+    font-weight: 650;
+}
+
+.report-list-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: .65rem;
+}
+
+.report-list-heading .report-section-label {
+    margin-bottom: .1rem;
+}
+
+.report-list-heading p {
+    margin: 0;
+    color: var(--wepro-muted);
+    font-size: .62rem;
 }
 
 .report-toolbar {
@@ -2135,6 +2337,38 @@ textarea {
 .report-employee-item:has(.form-check-input:checked) .check-mark {
     opacity: 1;
     transform: scale(1);
+}
+
+@media (max-width: 767.98px) {
+    .report-period-switch {
+        grid-template-columns: 1fr;
+    }
+
+    .report-period-option {
+        min-height: 62px;
+    }
+
+    .report-period-panel {
+        grid-template-columns: 1fr;
+    }
+
+    .report-period-panel .form-label,
+    .report-period-panel .form-control,
+    .report-period-panel .form-select,
+    .report-layout-note {
+        grid-column: 1;
+        grid-row: auto;
+    }
+
+    .time-report-header {
+        align-items: flex-start;
+    }
+
+    .time-report-print {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 /* Alerts and toast */
@@ -2744,11 +2978,11 @@ textarea {
         padding-left: 1.1rem;
     }
 
-    .week-report-header .modal-title-group {
+    .time-report-header .modal-title-group {
         width: calc(100% - 2.4rem);
     }
 
-    .week-report-print {
+    .time-report-print {
         order: 3;
         width: 100%;
     }

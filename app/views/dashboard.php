@@ -8,17 +8,21 @@ foreach ($statuses as $itemStatus) {
     if (($itemStatus['status'] ?? '') === 'WORKING' && empty($itemStatus['stale_session'])) $workingCount++;
     if (($itemStatus['status'] ?? '') === 'ON_BREAK') $breakCount++;
 }
+$reportNow = new DateTimeImmutable('now', new DateTimeZone('Europe/Berlin'));
+$currentReportWeek = sprintf('%04d-W%02d', (int)$week['year'], (int)$week['week']);
+$currentReportMonth = $reportNow->format('Y-m');
+$currentReportYear = $reportNow->format('Y');
 ?>
 <section class="page-hero dashboard-hero">
     <div class="page-hero-copy">
         <div class="eyebrow">Administration</div>
         <h1>Mitarbeiter im Blick</h1>
-        <p>Arbeitszeiten, Anwesenheiten und Wochenzettel zentral und übersichtlich verwalten.</p>
+        <p>Arbeitszeiten, Anwesenheiten und Zeitnachweise zentral und übersichtlich verwalten.</p>
     </div>
     <div class="page-actions">
-        <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#weekReportModal">
+        <button class="btn btn-outline-brand" data-bs-toggle="modal" data-bs-target="#timeReportModal">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>
-            Wochenzettel
+            Zeitnachweise
         </button>
         <button class="btn btn-brand" data-bs-toggle="collapse" data-bs-target="#newEmployee" aria-expanded="false" aria-controls="newEmployee">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -277,35 +281,92 @@ foreach ($statuses as $itemStatus) {
     </div>
 </div>
 
-<div class="modal fade" id="weekReportModal" tabindex="-1" aria-labelledby="weekReportTitle" aria-hidden="true">
+<div class="modal fade" id="timeReportModal" tabindex="-1" aria-labelledby="timeReportTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
-        <form class="modal-content" method="post" action="<?= h(url('/reports/week.pdf')) ?>" target="_blank" id="weekReportForm">
+        <form class="modal-content" method="post" action="<?= h(url('/reports/time.pdf')) ?>" target="_blank" id="timeReportForm">
             <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
-            <div class="modal-header week-report-header">
+            <div class="modal-header time-report-header">
                 <div class="modal-title-group me-auto">
-                    <div class="eyebrow">KW <?= h(sprintf('%02d', $week['week'])) ?></div>
-                    <h2 class="modal-title" id="weekReportTitle">Wochenzettel drucken</h2>
-                    <p><?= h($week['start_label']) ?> bis <?= h($week['end_label']) ?></p>
+                    <div class="eyebrow" id="reportPeriodEyebrow">Wöchentlicher Nachweis</div>
+                    <h2 class="modal-title" id="timeReportTitle">Zeitnachweise als PDF</h2>
+                    <p id="reportPeriodDescription">Eine übersichtliche Seite je Mitarbeiter für die gewählte Kalenderwoche.</p>
                 </div>
-                <button type="submit" class="btn btn-brand week-report-print">
+                <button type="submit" class="btn btn-brand time-report-print" id="reportPdfSubmit">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z"/></svg>
-                    PDF öffnen
+                    <span id="reportPdfSubmitLabel">Wochen-PDF öffnen</span>
                 </button>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
             </div>
             <div class="modal-body">
+                <section class="report-period-section" aria-labelledby="reportPeriodHeading">
+                    <div class="report-section-label" id="reportPeriodHeading">Zeitraum und Seitenaufbau</div>
+                    <div class="report-period-switch" role="radiogroup" aria-label="Art des Zeitnachweises">
+                        <label class="report-period-option">
+                            <input type="radio" name="report_type" value="week" checked>
+                            <span class="report-period-icon" aria-hidden="true">7</span>
+                            <span class="report-period-option-copy">
+                                <strong>Woche</strong>
+                                <small>7 Tage detailliert</small>
+                            </span>
+                            <span class="report-period-check" aria-hidden="true"></span>
+                        </label>
+                        <label class="report-period-option">
+                            <input type="radio" name="report_type" value="month">
+                            <span class="report-period-icon" aria-hidden="true">31</span>
+                            <span class="report-period-option-copy">
+                                <strong>Monat</strong>
+                                <small>Alle Tage auf einer Seite</small>
+                            </span>
+                            <span class="report-period-check" aria-hidden="true"></span>
+                        </label>
+                        <label class="report-period-option">
+                            <input type="radio" name="report_type" value="year">
+                            <span class="report-period-icon" aria-hidden="true">12</span>
+                            <span class="report-period-option-copy">
+                                <strong>Jahr</strong>
+                                <small>12 Monate als Übersicht</small>
+                            </span>
+                            <span class="report-period-check" aria-hidden="true"></span>
+                        </label>
+                    </div>
+
+                    <div class="report-period-settings">
+                        <div class="report-period-panel" data-report-period-panel="week">
+                            <label class="form-label" for="reportWeek">Kalenderwoche</label>
+                            <input class="form-control" id="reportWeek" name="report_week" type="week" value="<?= h($currentReportWeek) ?>" min="1970-W01" max="2200-W53" required>
+                            <span class="report-layout-note"><strong>DIN A4 Hochformat:</strong> tägliche Beginn-, Ende-, Pausen- und Arbeitszeiten mit Unterschriftsfeld.</span>
+                        </div>
+                        <div class="report-period-panel" data-report-period-panel="month" hidden>
+                            <label class="form-label" for="reportMonth">Monat</label>
+                            <input class="form-control" id="reportMonth" name="report_month" type="month" value="<?= h($currentReportMonth) ?>" min="1970-01" max="2200-12" disabled required>
+                            <span class="report-layout-note"><strong>DIN A4 Querformat:</strong> alle Kalendertage detailliert und kompakt auf genau einer Seite pro Person.</span>
+                        </div>
+                        <div class="report-period-panel" data-report-period-panel="year" hidden>
+                            <label class="form-label" for="reportYear">Kalenderjahr</label>
+                            <input class="form-control" id="reportYear" name="report_year" type="number" value="<?= h($currentReportYear) ?>" min="1970" max="2200" step="1" disabled required>
+                            <span class="report-layout-note"><strong>DIN A4 Querformat:</strong> Monatswerte, Urlaub, Krankheit, Feiertage und Jahresdifferenz auf einer Seite.</span>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="report-list-heading">
+                    <div>
+                        <div class="report-section-label">Mitarbeiter</div>
+                        <p>Jede ausgewählte Person erhält ein eigenes PDF-Blatt.</p>
+                    </div>
+                    <span class="selection-count" id="reportSelectionCount"></span>
+                </div>
                 <div class="report-toolbar">
                     <label class="search-field flex-grow-1" for="reportEmployeeSearch">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-                        <input id="reportEmployeeSearch" type="search" placeholder="Liste durchsuchen" autocomplete="off">
+                        <input id="reportEmployeeSearch" type="search" placeholder="Mitarbeiter durchsuchen" autocomplete="off">
                     </label>
-                    <span class="selection-count" id="reportSelectionCount"></span>
                 </div>
                 <label class="report-select-all">
                     <input class="form-check-input" type="checkbox" id="selectAllEmployees" checked>
                     <span>
-                        <strong>Alle Mitarbeiter auswählen</strong>
-                        <small>Für jede Auswahl wird eine eigene PDF-Seite erstellt.</small>
+                        <strong>Alle aktiven Mitarbeiter auswählen</strong>
+                        <small>Die Reihenfolge im PDF ist alphabetisch.</small>
                     </span>
                 </label>
                 <div class="report-employee-list" id="reportEmployeeList">

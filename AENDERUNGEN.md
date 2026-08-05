@@ -1,3 +1,15 @@
+## Zeitnachweise und sichtbarer Pausenmodus (v16)
+
+- Der bisherige Wochenzettel-Dialog wurde zu einem gemeinsamen Bereich **Zeitnachweise** erweitert.
+- Administration kann zwischen **Woche**, **Monat** und **Jahr** wechseln und den gewünschten Zeitraum frei auswählen.
+- Für jede ausgewählte Person entsteht weiterhin genau eine eigene PDF-Seite.
+- Der Wochenbericht bleibt eine detaillierte A4-Hochformatseite mit sieben Tageszeilen und Unterschriftsfeld.
+- Der Monatsbericht nutzt A4-Querformat und zeigt alle Kalendertage mit Beginn, Ende, Pause, Arbeitszeit, Sollzeit, Differenz und Bemerkung kompakt auf einer Seite.
+- Der Jahresbericht nutzt A4-Querformat und fasst die zwölf Monate mit Sollzeit, Arbeitszeit, Pausen, Differenz, Urlaubs-, Krankheits-, Feiertags- und Anwesenheitstagen auf einer Seite zusammen.
+- Abwesenheiten, Wochenenden und Feiertage werden in den PDF-Tabellen dezent farblich unterschieden.
+- Während einer laufenden Pause erhält die persönliche Stempeluhr einen sanft animierten orangefarbenen Seitenhintergrund und ein orange getöntes Uhr-Panel. Beim Beenden der Pause blendet die Darstellung wieder zurück.
+- Für diese Erweiterung ist keine Datenbankmigration erforderlich.
+
 ## Mitarbeiterübersicht: aktive Beschäftigte als Standard
 
 - In der Admin-Mitarbeiterübersicht werden standardmäßig nur aktiv beschäftigte Mitarbeiter angezeigt.

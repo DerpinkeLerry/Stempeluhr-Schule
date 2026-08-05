@@ -414,6 +414,7 @@
             if (actions) actions.innerHTML = actionHtml(root.dataset.employeeId, result.status);
             if (breakRest) breakRest.setAttribute('aria-hidden', isOnBreak ? 'false' : 'true');
             root.classList.toggle('on-break', isOnBreak);
+            document.body.classList.toggle('employee-on-break', isOnBreak);
             tickMe();
         } catch (_) {
             // Bestehende Anzeige beibehalten.
@@ -655,10 +656,52 @@
         syncAbsencePortion(form);
     });
 
-    const weekReportForm = document.getElementById('weekReportForm');
+    const timeReportForm = document.getElementById('timeReportForm');
     const selectAllEmployees = document.getElementById('selectAllEmployees');
     const reportCheckboxes = Array.from(document.querySelectorAll('.report-employee-checkbox'));
     const reportSelectionCount = document.getElementById('reportSelectionCount');
+    const reportTypeInputs = Array.from(document.querySelectorAll('input[name="report_type"]'));
+    const reportPeriodPanels = Array.from(document.querySelectorAll('[data-report-period-panel]'));
+    const reportPeriodEyebrow = document.getElementById('reportPeriodEyebrow');
+    const reportPeriodDescription = document.getElementById('reportPeriodDescription');
+    const reportPdfSubmitLabel = document.getElementById('reportPdfSubmitLabel');
+
+    const reportTypeCopy = {
+        week: {
+            eyebrow: 'Wöchentlicher Nachweis',
+            description: 'Eine übersichtliche Seite je Mitarbeiter für die gewählte Kalenderwoche.',
+            button: 'Wochen-PDF öffnen'
+        },
+        month: {
+            eyebrow: 'Monatlicher Nachweis',
+            description: 'Alle Kalendertage des gewählten Monats kompakt auf einer Seite je Mitarbeiter.',
+            button: 'Monats-PDF öffnen'
+        },
+        year: {
+            eyebrow: 'Jährlicher Nachweis',
+            description: 'Die zwölf Monate mit Arbeitszeit, Saldo und Abwesenheitskennzahlen auf einer Seite je Mitarbeiter.',
+            button: 'Jahres-PDF öffnen'
+        }
+    };
+
+    function selectedReportType() {
+        return reportTypeInputs.find(input => input.checked)?.value || 'week';
+    }
+
+    function syncReportPeriod() {
+        const type = selectedReportType();
+        reportPeriodPanels.forEach(panel => {
+            const active = panel.dataset.reportPeriodPanel === type;
+            panel.hidden = !active;
+            panel.querySelectorAll('input, select').forEach(input => {
+                input.disabled = !active;
+            });
+        });
+        const copy = reportTypeCopy[type] || reportTypeCopy.week;
+        if (reportPeriodEyebrow) reportPeriodEyebrow.textContent = copy.eyebrow;
+        if (reportPeriodDescription) reportPeriodDescription.textContent = copy.description;
+        if (reportPdfSubmitLabel) reportPdfSubmitLabel.textContent = copy.button;
+    }
 
     function updateReportSelection() {
         if (!selectAllEmployees) return;
@@ -669,6 +712,9 @@
             reportSelectionCount.textContent = `${selected} von ${reportCheckboxes.length} ausgewählt`;
         }
     }
+
+    reportTypeInputs.forEach(input => input.addEventListener('change', syncReportPeriod));
+    if (reportTypeInputs.length) syncReportPeriod();
 
     if (selectAllEmployees) {
         selectAllEmployees.addEventListener('change', () => {
@@ -681,11 +727,18 @@
         updateReportSelection();
     }
 
-    if (weekReportForm) {
-        weekReportForm.addEventListener('submit', event => {
+    if (timeReportForm) {
+        timeReportForm.addEventListener('submit', event => {
             if (!reportCheckboxes.some(box => box.checked)) {
                 event.preventDefault();
                 showToast('Bitte mindestens einen Mitarbeiter auswählen.', 'warning');
+                return;
+            }
+            const activePanel = reportPeriodPanels.find(panel => !panel.hidden);
+            const activeInput = activePanel?.querySelector('input:not([type="radio"]), select');
+            if (activeInput && !activeInput.checkValidity()) {
+                event.preventDefault();
+                activeInput.reportValidity();
             }
         });
     }
@@ -1320,6 +1373,8 @@
         setInterval(refreshDashboard, 10000);
     }
     if (document.getElementById('meRoot')) {
+        const meRoot = document.getElementById('meRoot');
+        document.body.classList.toggle('employee-on-break', meRoot?.classList.contains('on-break'));
         refreshMe();
         setInterval(tickMe, 1000);
         setInterval(refreshMe, 10000);

@@ -19,7 +19,8 @@ PHP-Anwendung zur Arbeitszeit-, Pausen-, Abwesenheits- und Urlaubsverwaltung mit
 - serverseitige Sperre bei nicht ausreichendem Urlaubsbestand
 - ganze sowie halbe Urlaubstage vormittags oder nachmittags
 - Krankheit, Schule und sonstige Abwesenheiten
-- Wochenzettel als PDF mit Sollzeit und Differenz
+- Wochen-, Monats- und Jahresnachweise als PDF; jede Person erhält genau eine eigene, druckfertige Seite
+- deutliche orange Pausenansicht, damit ein laufender Pausenstatus auch aus größerer Entfernung erkennbar ist
 - Feiertage für Bayern/Kaufbeuren von 2025 bis 2035
 - vorbereitete Legacy-IDs für den späteren Import aus der alten MySQL-Stempeluhr
 
