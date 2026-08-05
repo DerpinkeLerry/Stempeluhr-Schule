@@ -153,6 +153,65 @@ $tests['Genehmigte und abgelehnte Anträge bleiben dauerhaft im Archiv'] = stati
     vacationAssertSame('Besetzung nicht ausreichend', $rejectedRow['decision_note'], 'Die Ablehnungsbegründung muss gespeichert bleiben');
 };
 
+$tests['Mitarbeiter können genehmigten Urlaub verschieben und löschen lassen'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId, $adminId] = vacationTestContext('2026-08-05 08:00:00');
+    $service->updateVacationAccount($employeeId, 2026, 12, 0, 0);
+    $absenceId = $service->createAbsence($employeeId, 'VACATION', '2026-09-07', '2026-09-11', 'Sommerurlaub');
+
+    $changeRequestId = $service->createVacationChangeRequest(
+        $employeeId,
+        $absenceId,
+        'CHANGE',
+        '2026-09-14',
+        '2026-09-18',
+        'FULL',
+        'Familientermin verschoben'
+    );
+
+    $unchanged = $pdo->query('SELECT start_date, end_date FROM absence WHERE id=' . $absenceId)->fetch();
+    vacationAssertSame('2026-09-07', $unchanged['start_date'], 'Vor der Genehmigung darf der Urlaub nicht verändert werden');
+    vacationAssertSame('2026-09-11', $unchanged['end_date'], 'Vor der Genehmigung darf der Urlaub nicht verändert werden');
+
+    $changeResult = $service->decideVacationRequest($changeRequestId, $adminId, 'APPROVED', 'Passt');
+    vacationAssertSame('changed', $changeResult['action'], 'Die Änderung muss als solche zurückgemeldet werden');
+    vacationAssertSame($absenceId, (int)$changeResult['absence_id'], 'Beim Verschieben muss derselbe Urlaubseintrag weiterverwendet werden');
+
+    $changed = $pdo->query('SELECT start_date, end_date, note FROM absence WHERE id=' . $absenceId)->fetch();
+    vacationAssertSame('2026-09-14', $changed['start_date'], 'Der Urlaub wurde nicht auf den neuen Beginn verschoben');
+    vacationAssertSame('2026-09-18', $changed['end_date'], 'Der Urlaub wurde nicht auf das neue Ende verschoben');
+    vacationAssertSame('Sommerurlaub', $changed['note'], 'Die interne Notiz des bestehenden Urlaubs darf nicht durch die Antragsbegründung ersetzt werden');
+
+    $deleteRequestId = $service->createVacationChangeRequest(
+        $employeeId,
+        $absenceId,
+        'DELETE',
+        note: 'Urlaub wird nicht mehr benötigt'
+    );
+    $deleteResult = $service->decideVacationRequest($deleteRequestId, $adminId, 'APPROVED', 'Entfernt');
+    vacationAssertSame('deleted', $deleteResult['action'], 'Die Löschung muss als solche zurückgemeldet werden');
+    vacationAssertSame(0, (int)$pdo->query('SELECT COUNT(*) FROM absence WHERE id=' . $absenceId)->fetchColumn(), 'Der Urlaub muss nach Genehmigung gelöscht sein');
+
+    vacationAssertSame(2, (int)$pdo->query("SELECT COUNT(*) FROM vacation_request WHERE request_type IN ('CHANGE','DELETE')")->fetchColumn(), 'Änderungs- und Löschantrag müssen dauerhaft gespeichert bleiben');
+    $deleteArchive = $pdo->query('SELECT status, target_absence_id, original_start_date, original_end_date FROM vacation_request WHERE id=' . $deleteRequestId)->fetch();
+    vacationAssertSame('APPROVED', $deleteArchive['status'], 'Der Löschantrag muss im Archiv genehmigt bleiben');
+    vacationAssertSame(null, $deleteArchive['target_absence_id'], 'Nach der Löschung darf nur die direkte Verknüpfung entfernt werden');
+    vacationAssertSame('2026-09-14', $deleteArchive['original_start_date'], 'Der ursprüngliche Zeitraum muss trotz Löschung im Archiv bleiben');
+    vacationAssertSame('2026-09-18', $deleteArchive['original_end_date'], 'Der ursprüngliche Zeitraum muss trotz Löschung im Archiv bleiben');
+};
+
+$tests['Pro Urlaub ist nur ein offener Änderungsantrag erlaubt'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = vacationTestContext('2026-08-05 08:00:00');
+    $service->updateVacationAccount($employeeId, 2026, 10, 0, 0);
+    $absenceId = $service->createAbsence($employeeId, 'VACATION', '2026-10-05', '2026-10-06');
+    $service->createVacationChangeRequest($employeeId, $absenceId, 'CHANGE', '2026-10-12', '2026-10-13');
+
+    vacationExpectException(
+        static fn() => $service->createVacationChangeRequest($employeeId, $absenceId, 'DELETE', note: 'Doppelt'),
+        'bereits einen offenen Änderungsantrag'
+    );
+    vacationAssertSame(1, (int)$pdo->query("SELECT COUNT(*) FROM vacation_request WHERE status='PENDING'")->fetchColumn(), 'Der doppelte Änderungsantrag darf nicht gespeichert werden');
+};
+
 $tests['Antragsarchiv bleibt auch für deaktivierte Mitarbeiter sichtbar'] = static function (): void {
     [$pdo, $service, &$clock, $employeeId, $adminId] = vacationTestContext('2026-08-05 08:00:00');
     $service->updateVacationAccount($employeeId, 2026, 10, 0, 0);

@@ -240,6 +240,10 @@ final class Controller
             $requestPageCount = 1;
             $requests = $this->service->listVacationRequestsForEmployee($currentUserId);
             $ownVacationAccount = $this->service->getVacationAccount($currentUserId, $year);
+            $editableVacations = $this->service->listEditableVacationAbsencesForEmployee($currentUserId, $today);
+        }
+        if ($isAdmin) {
+            $editableVacations = [];
         }
 
         $this->render('vacation_calendar', compact(
@@ -254,6 +258,7 @@ final class Controller
             'today',
             'vacationAccounts',
             'ownVacationAccount',
+            'editableVacations',
             'requests',
             'requestStatus',
             'requestCount',
@@ -530,6 +535,30 @@ final class Controller
             json_response(['ok' => false, 'error' => $e->getMessage()], 400);
         } catch (Throwable) {
             json_response(['ok' => false, 'error' => 'Urlaubsantrag konnte nicht gespeichert werden'], 500);
+        }
+    }
+
+    public function apiVacationRequestChangeCreate(): never
+    {
+        require_post();
+        verify_csrf();
+        $employeeId = require_auth(true);
+
+        try {
+            $requestId = $this->service->createVacationChangeRequest(
+                $employeeId,
+                (int)($_POST['target_absence_id'] ?? 0),
+                (string)($_POST['request_type'] ?? ''),
+                (string)($_POST['start_date'] ?? ''),
+                (string)($_POST['end_date'] ?? ''),
+                (string)($_POST['portion'] ?? 'FULL'),
+                (string)($_POST['note'] ?? '')
+            );
+            json_response(['ok' => true, 'requestId' => $requestId]);
+        } catch (RuntimeException $e) {
+            json_response(['ok' => false, 'error' => $e->getMessage()], 400);
+        } catch (Throwable) {
+            json_response(['ok' => false, 'error' => 'Der Änderungsantrag konnte nicht gespeichert werden'], 500);
         }
     }
 

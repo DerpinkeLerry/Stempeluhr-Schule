@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const DATABASE_SCHEMA_VERSION = 3;
+const DATABASE_SCHEMA_VERSION = 4;
 
 function db(): PDO
 {
@@ -49,10 +49,11 @@ function migrate_database(PDO $pdo): void
         && table_has_column($pdo, 'absence', 'portion')
         && table_has_column($pdo, 'public_holiday', 'source');
 
-    // Version 3 only adds the persistent vacation_request table. The schema is
-    // executed directly after this migration and can create that table without
-    // rebuilding the established time-tracking tables.
+    // Versions 3 and 4 only extend the persistent vacation-request workflow.
+    // These additions can be applied in place without rebuilding the established
+    // time-tracking tables.
     if ($version >= 2 && $coreSchemaCurrent) {
+        migrate_vacation_requests_v4($pdo);
         $pdo->exec('PRAGMA user_version = ' . DATABASE_SCHEMA_VERSION);
         return;
     }
@@ -253,6 +254,32 @@ function migrate_database(PDO $pdo): void
     } finally {
         $pdo->exec('PRAGMA foreign_keys = ON');
     }
+}
+
+function migrate_vacation_requests_v4(PDO $pdo): void
+{
+    if (!table_exists($pdo, 'vacation_request')) {
+        return;
+    }
+
+    $columns = table_columns($pdo, 'vacation_request');
+    $additions = [
+        'request_type' => "ALTER TABLE vacation_request ADD COLUMN request_type TEXT NOT NULL DEFAULT 'CREATE' CHECK(request_type IN ('CREATE', 'CHANGE', 'DELETE'))",
+        'target_absence_id' => 'ALTER TABLE vacation_request ADD COLUMN target_absence_id INTEGER REFERENCES absence(id) ON DELETE SET NULL',
+        'original_start_date' => 'ALTER TABLE vacation_request ADD COLUMN original_start_date TEXT',
+        'original_end_date' => 'ALTER TABLE vacation_request ADD COLUMN original_end_date TEXT',
+        'original_portion' => "ALTER TABLE vacation_request ADD COLUMN original_portion TEXT CHECK(original_portion IS NULL OR original_portion IN ('FULL', 'AM', 'PM'))",
+        'original_note' => "ALTER TABLE vacation_request ADD COLUMN original_note TEXT NOT NULL DEFAULT ''",
+    ];
+
+    foreach ($additions as $column => $sql) {
+        if (!in_array($column, $columns, true)) {
+            $pdo->exec($sql);
+        }
+    }
+
+    $pdo->exec("UPDATE vacation_request SET request_type='CREATE' WHERE request_type IS NULL OR trim(request_type)=''");
+    $pdo->exec('CREATE INDEX IF NOT EXISTS idx_vacation_request_target_status ON vacation_request(target_absence_id, status)');
 }
 
 function table_exists(PDO $pdo, string $table): bool

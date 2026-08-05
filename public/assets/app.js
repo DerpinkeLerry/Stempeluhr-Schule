@@ -773,7 +773,8 @@
         const vacationForms = [
             document.getElementById('vacationCalendarCreateForm'),
             document.getElementById('vacationCalendarEditForm'),
-            document.getElementById('vacationRequestForm')
+            document.getElementById('vacationRequestForm'),
+            document.getElementById('vacationChangeRequestForm')
         ].filter(Boolean);
         vacationForms.forEach(form => {
             form.elements.start_date?.addEventListener('change', () => syncVacationFormDates(form));
@@ -1127,20 +1128,127 @@
             });
         }
 
+        const changeRequestForm = document.getElementById('vacationChangeRequestForm');
+        const changeRequestModal = document.getElementById('vacationChangeRequestModal');
+        const changeTarget = document.getElementById('vacationChangeTarget');
+        const changeFields = document.getElementById('vacationChangeFields');
+        const changeCurrentSummary = document.getElementById('vacationChangeCurrentSummary');
+        const changeCurrentPeriod = document.getElementById('vacationChangeCurrentPeriod');
+        const changeCurrentDays = document.getElementById('vacationChangeCurrentDays');
+
+        const selectedChangeType = () => changeRequestForm?.querySelector('input[name="request_type"]:checked')?.value || 'CHANGE';
+
+        const populateChangeRequestFromVacation = () => {
+            if (!changeRequestForm || !changeTarget) return;
+            const option = changeTarget.selectedOptions?.[0];
+            const hasVacation = Boolean(option?.value);
+            if (hasVacation) {
+                changeRequestForm.elements.start_date.value = option.dataset.startDate || '';
+                changeRequestForm.elements.end_date.value = option.dataset.endDate || '';
+                changeRequestForm.elements.portion.value = option.dataset.portion || 'FULL';
+                if (changeCurrentPeriod) changeCurrentPeriod.textContent = option.dataset.period || '';
+                if (changeCurrentDays) changeCurrentDays.textContent = `${option.dataset.days || '0,0'} Urlaubstage`;
+            } else {
+                changeRequestForm.elements.start_date.value = '';
+                changeRequestForm.elements.end_date.value = '';
+                changeRequestForm.elements.portion.value = 'FULL';
+                if (changeCurrentPeriod) changeCurrentPeriod.textContent = '';
+                if (changeCurrentDays) changeCurrentDays.textContent = '';
+            }
+            if (changeCurrentSummary) changeCurrentSummary.hidden = !hasVacation;
+            syncVacationFormDates(changeRequestForm);
+        };
+
+        const syncChangeRequestType = () => {
+            if (!changeRequestForm || !changeFields) return;
+            const isDelete = selectedChangeType() === 'DELETE';
+            changeFields.hidden = isDelete;
+            ['start_date', 'end_date'].forEach(name => {
+                if (changeRequestForm.elements[name]) changeRequestForm.elements[name].required = !isDelete;
+            });
+            const submit = changeRequestForm.querySelector('[type="submit"]');
+            if (submit) submit.textContent = isDelete ? 'Löschung beantragen' : 'Änderungsantrag senden';
+        };
+
+        if (changeRequestForm && changeTarget) {
+            changeTarget.addEventListener('change', populateChangeRequestFromVacation);
+            changeRequestForm.querySelectorAll('input[name="request_type"]').forEach(input => {
+                input.addEventListener('change', syncChangeRequestType);
+            });
+            populateChangeRequestFromVacation();
+            syncChangeRequestType();
+
+            changeRequestModal?.addEventListener('hidden.bs.modal', () => {
+                changeRequestForm.reset();
+                populateChangeRequestFromVacation();
+                syncChangeRequestType();
+            });
+
+            changeRequestForm.addEventListener('submit', async event => {
+                event.preventDefault();
+                const submit = changeRequestForm.querySelector('[type="submit"]');
+                setButtonLoading(submit, true);
+                try {
+                    const requestType = selectedChangeType();
+                    await apiPost('/api/vacation-request/change', Object.fromEntries(new FormData(changeRequestForm).entries()));
+                    queueToastAfterReload(
+                        requestType === 'DELETE'
+                            ? 'Der Antrag zur Löschung des Urlaubs wurde gespeichert und an die Administration übermittelt.'
+                            : 'Der Änderungsantrag wurde gespeichert und an die Administration übermittelt.',
+                        'success'
+                    );
+                } catch (error) {
+                    showToast(error.message, 'danger');
+                    setButtonLoading(submit, false);
+                }
+            });
+        }
+
         const decisionForm = document.getElementById('vacationDecisionForm');
+        const decisionModalLabel = document.getElementById('vacationDecisionModalLabel');
+        const decisionType = document.getElementById('vacationDecisionType');
         const decisionEmployee = document.getElementById('vacationDecisionEmployee');
         const decisionPeriod = document.getElementById('vacationDecisionPeriod');
         const decisionDays = document.getElementById('vacationDecisionDays');
         const decisionRequestNote = document.getElementById('vacationDecisionRequestNote');
+        const decisionApproveText = document.getElementById('vacationDecisionApproveText');
         document.addEventListener('click', event => {
             const button = event.target.closest('.vacation-request-review');
             if (!button || !decisionForm) return;
+            const requestType = button.dataset.requestType || 'CREATE';
             decisionForm.elements.requestId.value = button.dataset.requestId || '';
             decisionForm.elements.decision.value = 'APPROVED';
             decisionForm.elements.decision_note.value = '';
+            if (decisionModalLabel) {
+                decisionModalLabel.textContent = requestType === 'CHANGE'
+                    ? 'Urlaubsänderung entscheiden'
+                    : requestType === 'DELETE'
+                        ? 'Urlaubslöschung entscheiden'
+                        : 'Urlaubsantrag entscheiden';
+            }
+            if (decisionType) {
+                decisionType.textContent = button.dataset.requestTypeLabel || 'Neuer Urlaub';
+                decisionType.classList.remove('request-type-create', 'request-type-change', 'request-type-delete');
+                decisionType.classList.add(
+                    requestType === 'CHANGE' ? 'request-type-change' : requestType === 'DELETE' ? 'request-type-delete' : 'request-type-create'
+                );
+            }
             if (decisionEmployee) decisionEmployee.textContent = button.dataset.employeeName || '';
             if (decisionPeriod) decisionPeriod.textContent = button.dataset.period || '';
-            if (decisionDays) decisionDays.textContent = `${button.dataset.days || '0,0'} Urlaubstage`;
+            if (decisionDays) {
+                decisionDays.textContent = requestType === 'CHANGE'
+                    ? `Neu ${button.dataset.days || '0,0'} Urlaubstage · bisher ${button.dataset.originalDays || '0,0'}`
+                    : requestType === 'DELETE'
+                        ? `${button.dataset.originalDays || '0,0'} Urlaubstage werden entfernt`
+                        : `${button.dataset.days || '0,0'} Urlaubstage`;
+            }
+            if (decisionApproveText) {
+                decisionApproveText.textContent = requestType === 'CHANGE'
+                    ? 'Der bestehende Urlaub wird sofort auf den neuen Zeitraum verschoben.'
+                    : requestType === 'DELETE'
+                        ? 'Der bestehende Urlaub wird sofort aus dem Kalender entfernt.'
+                        : 'Der Urlaub wird sofort im Kalender eingetragen.';
+            }
             if (decisionRequestNote) {
                 const note = button.dataset.note || '';
                 decisionRequestNote.textContent = note ? `Hinweis: ${note}` : '';
@@ -1157,9 +1265,14 @@
                 try {
                     const result = await apiPost('/api/vacation-request/decision', data);
                     const approved = result.status === 'APPROVED';
+                    const approvedMessage = result.action === 'changed'
+                        ? `Der Urlaub von ${result.employee_name} wurde wie beantragt geändert.`
+                        : result.action === 'deleted'
+                            ? `Der Urlaub von ${result.employee_name} wurde wie beantragt gelöscht.`
+                            : `Der Antrag von ${result.employee_name} wurde genehmigt und im Kalender eingetragen.`;
                     queueToastAfterReload(
                         approved
-                            ? `Der Antrag von ${result.employee_name} wurde genehmigt und im Kalender eingetragen.`
+                            ? approvedMessage
                             : `Der Antrag von ${result.employee_name} wurde abgelehnt und archiviert.`,
                         approved ? 'success' : 'info'
                     );

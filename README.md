@@ -13,7 +13,8 @@ PHP-Anwendung zur Arbeitszeit-, Pausen-, Abwesenheits- und Urlaubsverwaltung mit
 - Urlaubskonto pro Kalenderjahr mit Anspruch, Übertrag und Korrektur
 - gemeinsamer Urlaubskalender für alle aktiven Mitarbeiter als kompakte, bildschirmbreite Jahresübersicht
 - direkte Urlaubsauswahl für Administratoren per Klick oder Ziehen über die Tagesfelder oder den Tageskopf
-- dauerhaftes Urlaubsantragsarchiv mit Genehmigung oder Ablehnung durch die Administration
+- dauerhaftes Archiv für neue Urlaubs-, Verschiebungs- und Löschanträge mit Genehmigung oder Ablehnung durch die Administration
+- Mitarbeiter können genehmigten, noch nicht begonnenen Urlaub zur Verschiebung oder Löschung einreichen
 - automatische Übernahme ungenutzten Jahresurlaubs ins Folgejahr; Nutzung des Übertrags nur bis 31. März
 - serverseitige Sperre bei nicht ausreichendem Urlaubsbestand
 - ganze sowie halbe Urlaubstage vormittags oder nachmittags
@@ -59,7 +60,7 @@ Die Datenbank liegt unter:
 data/stempeluhr.sqlite
 ```
 
-Das Projekt verwendet Schema-Version 3. Eine ältere Projektdatenbank wird beim ersten Aufruf automatisch strukturell migriert. Version 3 ergänzt das dauerhafte Urlaubsantragsarchiv. Vor jedem Update muss die SQLite-Datei trotzdem separat gesichert werden.
+Das Projekt verwendet Schema-Version 4. Eine ältere Projektdatenbank wird beim ersten Aufruf automatisch strukturell migriert. Version 4 erweitert das dauerhafte Urlaubsantragsarchiv um Änderungs- und Löschanträge für bestehende Urlaube. Vor jedem Update muss die SQLite-Datei trotzdem separat gesichert werden.
 
 Die vollständige Tabellenbeschreibung steht in:
 
@@ -67,7 +68,7 @@ Die vollständige Tabellenbeschreibung steht in:
 database/STRUCTURE.md
 ```
 
-Die mitgelieferte Datenbank wurde bereits auf Version 2 umgestellt. Der spätere Import aus der alten MySQL-Stempeluhr ist noch nicht enthalten.
+Die mitgelieferte Datenbank ist bereits auf Version 4 vorbereitet. Der Import aus der alten MySQL-Stempeluhr bleibt weiterhin optional über die Werkzeuge im Ordner `tools` möglich.
 
 ## Wichtige Datenregeln
 
@@ -76,8 +77,8 @@ Die mitgelieferte Datenbank wurde bereits auf Version 2 umgestellt. Der spätere
 - Änderungen am Wochenplan gelten ab einem wählbaren Datum und überschreiben keine Vergangenheit.
 - Urlaub wird aus den genehmigten Abwesenheiten berechnet; halbe Tage zählen als `0,5`.
 - Ungenutzter regulärer Jahresurlaub wird automatisch ins Folgejahr übertragen. Dieser Übertrag kann nur für Urlaubstage bis einschließlich 31. März verwendet werden und verfällt danach.
-- Urlaubsanträge und direkte Urlaubseinträge werden blockiert, sobald der verfügbare Bestand nicht ausreicht.
-- Urlaubsanträge bleiben nach Genehmigung oder Ablehnung vollständig im Admin-Archiv erhalten.
+- Neue Urlaubs- und Verschiebungsanträge sowie direkte Urlaubseinträge werden blockiert, sobald der verfügbare Bestand nicht ausreicht.
+- Neue Urlaubs-, Änderungs- und Löschanträge bleiben nach Genehmigung oder Ablehnung vollständig im Admin-Archiv erhalten.
 - Ein ganzer Abwesenheitstag wird beim tatsächlichen Einstempeln für diesen Tag entfernt. Ein halber Urlaubstag bleibt bestehen.
 - Zeitstempel in `work_session` und `break_session` werden in UTC gespeichert.
 
@@ -127,7 +128,7 @@ PRAGMA foreign_key_check;
 
 ```text
 app/                 PHP-Code, Services und Views
-database/schema.sql  vollständiges Schema Version 3
+database/schema.sql  vollständiges Schema Version 4
 database/STRUCTURE.md Datenmodell und Migrationshinweise
 data/                SQLite-Datenbank
 public/              einziger öffentlicher Webordner

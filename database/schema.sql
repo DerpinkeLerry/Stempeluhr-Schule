@@ -112,6 +112,12 @@ CREATE TABLE IF NOT EXISTS absence (
 CREATE TABLE IF NOT EXISTS vacation_request (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     employee_id INTEGER NOT NULL,
+    request_type TEXT NOT NULL DEFAULT 'CREATE' CHECK(request_type IN ('CREATE', 'CHANGE', 'DELETE')),
+    target_absence_id INTEGER,
+    original_start_date TEXT,
+    original_end_date TEXT,
+    original_portion TEXT CHECK(original_portion IS NULL OR original_portion IN ('FULL', 'AM', 'PM')),
+    original_note TEXT NOT NULL DEFAULT '',
     start_date TEXT NOT NULL,
     end_date TEXT NOT NULL,
     portion TEXT NOT NULL DEFAULT 'FULL' CHECK(portion IN ('FULL', 'AM', 'PM')),
@@ -126,9 +132,19 @@ CREATE TABLE IF NOT EXISTS vacation_request (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(employee_id) REFERENCES employee(id) ON DELETE RESTRICT,
     FOREIGN KEY(decided_by) REFERENCES employee(id) ON DELETE SET NULL,
+    FOREIGN KEY(target_absence_id) REFERENCES absence(id) ON DELETE SET NULL,
     FOREIGN KEY(absence_id) REFERENCES absence(id) ON DELETE SET NULL,
     CHECK(end_date >= start_date),
-    CHECK(portion = 'FULL' OR start_date = end_date)
+    CHECK(portion = 'FULL' OR start_date = end_date),
+    CHECK(
+        request_type = 'CREATE'
+        OR (
+            original_start_date IS NOT NULL
+            AND original_end_date IS NOT NULL
+            AND original_portion IS NOT NULL
+            AND original_end_date >= original_start_date
+        )
+    )
 );
 
 CREATE TABLE IF NOT EXISTS public_holiday (
@@ -173,6 +189,7 @@ CREATE INDEX IF NOT EXISTS idx_break_work_start ON break_session(work_session_id
 CREATE INDEX IF NOT EXISTS idx_absence_employee_dates ON absence(employee_id, start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_vacation_request_employee_status ON vacation_request(employee_id, status, start_date, end_date);
 CREATE INDEX IF NOT EXISTS idx_vacation_request_status_requested ON vacation_request(status, requested_at DESC);
+CREATE INDEX IF NOT EXISTS idx_vacation_request_target_status ON vacation_request(target_absence_id, status);
 CREATE INDEX IF NOT EXISTS idx_holiday_region_day ON public_holiday(region, day);
 CREATE INDEX IF NOT EXISTS idx_overtime_day ON overtime_event(day);
 CREATE UNIQUE INDEX IF NOT EXISTS one_open_work ON work_session(employee_id) WHERE ended_at IS NULL;

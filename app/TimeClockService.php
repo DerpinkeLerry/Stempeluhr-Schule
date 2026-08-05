@@ -56,6 +56,39 @@ final class TimeClockService
         return $st->fetchAll();
     }
 
+    public function listEditableVacationAbsencesForEmployee(int $employeeId, string $fromDate): array
+    {
+        $employee = $this->getEmployee($employeeId);
+        if (!$employee || (int)$employee['active'] !== 1) {
+            throw new RuntimeException('Mitarbeiter nicht gefunden');
+        }
+        if (!$this->validDate($fromDate)) {
+            throw new RuntimeException('Das Startdatum ist ungültig');
+        }
+
+        $st = $this->pdo->prepare(
+            "SELECT a.*,
+                    MAX(CASE WHEN vr.status='PENDING' AND vr.request_type IN ('CHANGE', 'DELETE') THEN vr.id END) AS pending_change_request_id
+             FROM absence a
+             LEFT JOIN vacation_request vr ON vr.target_absence_id=a.id
+             WHERE a.employee_id=? AND a.type='VACATION' AND a.start_date>=?
+             GROUP BY a.id
+             ORDER BY a.start_date, a.end_date, a.id"
+        );
+        $st->execute([$employeeId, $fromDate]);
+        $vacations = $st->fetchAll();
+        foreach ($vacations as &$vacation) {
+            $vacation['vacation_days'] = $this->calculateVacationDaysForRange(
+                $employeeId,
+                (string)$vacation['start_date'],
+                (string)$vacation['end_date'],
+                (string)$vacation['portion']
+            );
+        }
+        unset($vacation);
+        return $vacations;
+    }
+
     public function countPendingVacationRequests(): int
     {
         return (int)$this->pdo->query("SELECT COUNT(*) FROM vacation_request WHERE status='PENDING'")->fetchColumn();
@@ -102,12 +135,7 @@ final class TimeClockService
         $st->execute();
         $requests = $st->fetchAll();
         foreach ($requests as &$request) {
-            $request['requested_days'] = $this->calculateVacationDaysForRange(
-                (int)$request['employee_id'],
-                (string)$request['start_date'],
-                (string)$request['end_date'],
-                (string)$request['portion']
-            );
+            $this->appendVacationRequestDayValues($request);
         }
         unset($request);
         return $requests;
@@ -128,12 +156,7 @@ final class TimeClockService
         $st->execute([$employeeId]);
         $requests = $st->fetchAll();
         foreach ($requests as &$request) {
-            $request['requested_days'] = $this->calculateVacationDaysForRange(
-                $employeeId,
-                (string)$request['start_date'],
-                (string)$request['end_date'],
-                (string)$request['portion']
-            );
+            $this->appendVacationRequestDayValues($request);
         }
         unset($request);
         return $requests;
@@ -1063,33 +1086,127 @@ final class TimeClockService
             throw new RuntimeException('Urlaub kann nur für heute oder einen zukünftigen Zeitraum beantragt werden');
         }
         $this->assertNoAbsenceOverlap($employeeId, $startDate, $endDate);
-
-        $overlap = $this->pdo->prepare(
-            "SELECT COUNT(*) FROM vacation_request
-             WHERE employee_id=? AND status='PENDING' AND start_date<=? AND end_date>=?"
-        );
-        $overlap->execute([$employeeId, $endDate, $startDate]);
-        if ((int)$overlap->fetchColumn() > 0) {
-            throw new RuntimeException('Für diesen Zeitraum gibt es bereits einen offenen Urlaubsantrag');
-        }
-
-        $pending = $this->pdo->prepare(
-            "SELECT start_date, end_date, portion FROM vacation_request
-             WHERE employee_id=? AND status='PENDING'"
-        );
-        $pending->execute([$employeeId]);
-        $ranges = $pending->fetchAll();
-        $ranges[] = ['start_date' => $startDate, 'end_date' => $endDate, 'portion' => $portion];
-        $this->assertVacationBalanceAvailable($employeeId, $ranges);
+        $this->assertNoPendingVacationRequestOverlap($employeeId, $startDate, $endDate);
+        $this->assertVacationPlanAvailableWithPendingRequests($employeeId, [
+            'request_type' => 'CREATE',
+            'target_absence_id' => null,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'portion' => $portion,
+        ]);
 
         $now = $this->nowUtc();
         $st = $this->pdo->prepare(
             "INSERT INTO vacation_request(
-                employee_id, start_date, end_date, portion, note, status,
+                employee_id, request_type, start_date, end_date, portion, note, status,
                 requested_at, created_at, updated_at
-             ) VALUES(?,?,?,?,?,'PENDING',?,?,?)"
+             ) VALUES(?,'CREATE',?,?,?,?, 'PENDING',?,?,?)"
         );
         $st->execute([$employeeId, $startDate, $endDate, $portion, trim($note), $now, $now, $now]);
+        return (int)$this->pdo->lastInsertId();
+    }
+
+    public function createVacationChangeRequest(
+        int $employeeId,
+        int $targetAbsenceId,
+        string $requestType,
+        string $startDate = '',
+        string $endDate = '',
+        string $portion = 'FULL',
+        string $note = ''
+    ): int {
+        $requestType = strtoupper(trim($requestType));
+        if (!in_array($requestType, ['CHANGE', 'DELETE'], true)) {
+            throw new RuntimeException('Die gewünschte Änderung ist ungültig');
+        }
+
+        $employee = $this->getEmployee($employeeId);
+        if (!$employee || (int)$employee['active'] !== 1) {
+            throw new RuntimeException('Mitarbeiter nicht gefunden');
+        }
+        if ($targetAbsenceId < 1) {
+            throw new RuntimeException('Bitte wählen Sie einen bestehenden Urlaub aus');
+        }
+
+        $targetSt = $this->pdo->prepare(
+            "SELECT * FROM absence WHERE id=? AND employee_id=? AND type='VACATION'"
+        );
+        $targetSt->execute([$targetAbsenceId, $employeeId]);
+        $target = $targetSt->fetch();
+        if (!$target) {
+            throw new RuntimeException('Der ausgewählte Urlaub wurde nicht gefunden');
+        }
+
+        $localToday = $this->now()->setTimezone(new DateTimeZone((string)$employee['timezone']))->format('Y-m-d');
+        if ((string)$target['start_date'] < $localToday) {
+            throw new RuntimeException('Bereits begonnener oder vergangener Urlaub kann nicht mehr per Antrag geändert werden');
+        }
+
+        $pendingTarget = $this->pdo->prepare(
+            "SELECT COUNT(*) FROM vacation_request
+             WHERE target_absence_id=? AND status='PENDING' AND request_type IN ('CHANGE', 'DELETE')"
+        );
+        $pendingTarget->execute([$targetAbsenceId]);
+        if ((int)$pendingTarget->fetchColumn() > 0) {
+            throw new RuntimeException('Für diesen Urlaub gibt es bereits einen offenen Änderungsantrag');
+        }
+
+        if ($requestType === 'DELETE') {
+            $startDate = (string)$target['start_date'];
+            $endDate = (string)$target['end_date'];
+            $portion = (string)$target['portion'];
+        } else {
+            $this->validateAbsenceInput($employeeId, 'VACATION', $portion, $startDate, $endDate);
+            if ($startDate < $localToday) {
+                throw new RuntimeException('Der neue Urlaubszeitraum muss heute oder in der Zukunft beginnen');
+            }
+            if ($this->calculateVacationDaysForRange($employeeId, $startDate, $endDate, $portion) <= 0) {
+                throw new RuntimeException('Der neue Zeitraum enthält keinen geplanten Arbeitstag');
+            }
+            if (
+                $startDate === (string)$target['start_date']
+                && $endDate === (string)$target['end_date']
+                && $portion === (string)$target['portion']
+            ) {
+                throw new RuntimeException('Der neue Zeitraum entspricht bereits dem bestehenden Urlaub');
+            }
+
+            $this->assertNoAbsenceOverlap($employeeId, $startDate, $endDate, $targetAbsenceId);
+            $this->assertNoPendingVacationRequestOverlap($employeeId, $startDate, $endDate);
+            $this->assertVacationPlanAvailableWithPendingRequests($employeeId, [
+                'request_type' => 'CHANGE',
+                'target_absence_id' => $targetAbsenceId,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'portion' => $portion,
+            ]);
+        }
+
+        $now = $this->nowUtc();
+        $st = $this->pdo->prepare(
+            "INSERT INTO vacation_request(
+                employee_id, request_type, target_absence_id,
+                original_start_date, original_end_date, original_portion, original_note,
+                start_date, end_date, portion, note, status,
+                requested_at, created_at, updated_at
+             ) VALUES(?,?,?,?,?,?,?,?,?,?,?,'PENDING',?,?,?)"
+        );
+        $st->execute([
+            $employeeId,
+            $requestType,
+            $targetAbsenceId,
+            (string)$target['start_date'],
+            (string)$target['end_date'],
+            (string)$target['portion'],
+            (string)$target['note'],
+            $startDate,
+            $endDate,
+            $portion,
+            trim($note),
+            $now,
+            $now,
+            $now,
+        ]);
         return (int)$this->pdo->lastInsertId();
     }
 
@@ -1125,20 +1242,62 @@ final class TimeClockService
                 throw new RuntimeException('Dieser Urlaubsantrag wurde bereits bearbeitet');
             }
 
+            $requestType = strtoupper((string)($request['request_type'] ?? 'CREATE'));
+            if (!in_array($requestType, ['CREATE', 'CHANGE', 'DELETE'], true)) {
+                throw new RuntimeException('Der Antragstyp ist ungültig');
+            }
+
             $absenceId = null;
+            $action = 'created';
             if ($decision === 'APPROVED') {
                 if ((int)$request['employee_active'] !== 1) {
                     throw new RuntimeException('Der Mitarbeiter ist nicht mehr aktiv; der Antrag kann nur noch abgelehnt werden');
                 }
-                $absenceId = $this->createAbsence(
-                    (int)$request['employee_id'],
-                    'VACATION',
-                    (string)$request['start_date'],
-                    (string)$request['end_date'],
-                    (string)$request['note'],
-                    (string)$request['portion'],
-                    'vacation_request'
-                );
+
+                if ($requestType === 'CREATE') {
+                    $absenceId = $this->createAbsence(
+                        (int)$request['employee_id'],
+                        'VACATION',
+                        (string)$request['start_date'],
+                        (string)$request['end_date'],
+                        (string)$request['note'],
+                        (string)$request['portion'],
+                        'vacation_request'
+                    );
+                } else {
+                    $targetAbsenceId = (int)($request['target_absence_id'] ?? 0);
+                    $targetSt = $this->pdo->prepare(
+                        "SELECT * FROM absence WHERE id=? AND employee_id=? AND type='VACATION'"
+                    );
+                    $targetSt->execute([$targetAbsenceId, (int)$request['employee_id']]);
+                    $target = $targetSt->fetch();
+                    if (!$target) {
+                        throw new RuntimeException('Der zugehörige Urlaub existiert nicht mehr; der Antrag kann nur noch abgelehnt werden');
+                    }
+
+                    $snapshotMatches = (string)$target['start_date'] === (string)($request['original_start_date'] ?? '')
+                        && (string)$target['end_date'] === (string)($request['original_end_date'] ?? '')
+                        && (string)$target['portion'] === (string)($request['original_portion'] ?? '');
+                    if (!$snapshotMatches) {
+                        throw new RuntimeException('Der Urlaub wurde zwischenzeitlich geändert; der Antrag kann nur noch abgelehnt werden');
+                    }
+
+                    if ($requestType === 'CHANGE') {
+                        $this->updateAbsence(
+                            $targetAbsenceId,
+                            'VACATION',
+                            (string)$request['start_date'],
+                            (string)$request['end_date'],
+                            (string)$target['note'],
+                            (string)$request['portion']
+                        );
+                        $absenceId = $targetAbsenceId;
+                        $action = 'changed';
+                    } else {
+                        $this->deleteAbsence($targetAbsenceId);
+                        $action = 'deleted';
+                    }
+                }
             }
 
             $now = $this->nowUtc();
@@ -1157,6 +1316,8 @@ final class TimeClockService
                 'status' => $decision,
                 'absence_id' => $absenceId,
                 'employee_name' => (string)$request['employee_name'],
+                'request_type' => $requestType,
+                'action' => $decision === 'APPROVED' ? $action : 'rejected',
             ];
         } catch (Throwable $e) {
             if ($this->pdo->inTransaction()) {
@@ -1633,6 +1794,89 @@ final class TimeClockService
         return $account;
     }
 
+    private function appendVacationRequestDayValues(array &$request): void
+    {
+        $employeeId = (int)$request['employee_id'];
+        $requestType = strtoupper((string)($request['request_type'] ?? 'CREATE'));
+        $request['request_type'] = in_array($requestType, ['CREATE', 'CHANGE', 'DELETE'], true)
+            ? $requestType
+            : 'CREATE';
+        $request['requested_days'] = $this->calculateVacationDaysForRange(
+            $employeeId,
+            (string)$request['start_date'],
+            (string)$request['end_date'],
+            (string)$request['portion']
+        );
+
+        $originalStart = (string)($request['original_start_date'] ?? '');
+        $originalEnd = (string)($request['original_end_date'] ?? '');
+        $originalPortion = (string)($request['original_portion'] ?? 'FULL');
+        $request['original_days'] = $originalStart !== '' && $originalEnd !== ''
+            ? $this->calculateVacationDaysForRange($employeeId, $originalStart, $originalEnd, $originalPortion)
+            : 0.0;
+    }
+
+    private function assertNoPendingVacationRequestOverlap(
+        int $employeeId,
+        string $startDate,
+        string $endDate,
+        int $excludeRequestId = 0
+    ): void {
+        $sql = "SELECT COUNT(*) FROM vacation_request
+                WHERE employee_id=? AND status='PENDING'
+                  AND request_type IN ('CREATE', 'CHANGE')
+                  AND start_date<=? AND end_date>=?";
+        $params = [$employeeId, $endDate, $startDate];
+        if ($excludeRequestId > 0) {
+            $sql .= ' AND id<>?';
+            $params[] = $excludeRequestId;
+        }
+        $st = $this->pdo->prepare($sql);
+        $st->execute($params);
+        if ((int)$st->fetchColumn() > 0) {
+            throw new RuntimeException('Für diesen Zeitraum gibt es bereits einen offenen Urlaubs- oder Änderungsantrag');
+        }
+    }
+
+    private function assertVacationPlanAvailableWithPendingRequests(int $employeeId, ?array $candidate = null): void
+    {
+        $pending = $this->pdo->prepare(
+            "SELECT request_type, target_absence_id, start_date, end_date, portion
+             FROM vacation_request
+             WHERE employee_id=? AND status='PENDING'"
+        );
+        $pending->execute([$employeeId]);
+        $requests = $pending->fetchAll();
+        if ($candidate !== null) {
+            $requests[] = $candidate;
+        }
+
+        $ranges = [];
+        $excludeAbsenceIds = [];
+        foreach ($requests as $request) {
+            $type = strtoupper((string)($request['request_type'] ?? 'CREATE'));
+            $targetAbsenceId = (int)($request['target_absence_id'] ?? 0);
+            // A pending deletion must not free vacation capacity before it is
+            // actually approved. A pending change, however, replaces its
+            // existing absence in the simulated plan.
+            if ($type === 'CHANGE' && $targetAbsenceId > 0) {
+                $excludeAbsenceIds[$targetAbsenceId] = $targetAbsenceId;
+            }
+            if (in_array($type, ['CREATE', 'CHANGE'], true)) {
+                $ranges[] = [
+                    'start_date' => (string)$request['start_date'],
+                    'end_date' => (string)$request['end_date'],
+                    'portion' => (string)$request['portion'],
+                ];
+            }
+        }
+
+        if ($ranges === []) {
+            return;
+        }
+        $this->assertVacationBalanceAvailable($employeeId, $ranges, array_values($excludeAbsenceIds));
+    }
+
     private function assertNoAbsenceOverlap(int $employeeId, string $startDate, string $endDate, int $excludeAbsenceId = 0): void
     {
         $sql = 'SELECT COUNT(*) FROM absence WHERE employee_id=? AND start_date<=? AND end_date>=?';
@@ -1664,7 +1908,7 @@ final class TimeClockService
         return array_sum(array_map(static fn(array $usage): float => (float)$usage['total_days'], $byYear));
     }
 
-    private function assertVacationBalanceAvailable(int $employeeId, array $ranges, int $excludeAbsenceId = 0): void
+    private function assertVacationBalanceAvailable(int $employeeId, array $ranges, int|array $excludeAbsenceIds = []): void
     {
         $employee = $this->getEmployee($employeeId);
         if (!$employee) {
@@ -1702,7 +1946,7 @@ final class TimeClockService
                 $employeeId,
                 $year,
                 (string)$employee['holiday_region'],
-                $excludeAbsenceId
+                $excludeAbsenceIds
             );
             $this->assertVacationUsageFitsAccount(
                 $year,
@@ -1799,16 +2043,21 @@ final class TimeClockService
         int $employeeId,
         int $year,
         string $region,
-        int $excludeAbsenceId = 0
+        int|array $excludeAbsenceIds = []
     ): array {
         $yearStart = sprintf('%04d-01-01', $year);
         $yearEnd = sprintf('%04d-12-31', $year);
         $sql = "SELECT * FROM absence
                 WHERE employee_id=? AND type='VACATION' AND start_date<=? AND end_date>=?";
         $params = [$employeeId, $yearEnd, $yearStart];
-        if ($excludeAbsenceId > 0) {
-            $sql .= ' AND id<>?';
-            $params[] = $excludeAbsenceId;
+        $excludeAbsenceIds = is_array($excludeAbsenceIds) ? $excludeAbsenceIds : [$excludeAbsenceIds];
+        $excludeAbsenceIds = array_values(array_unique(array_filter(
+            array_map('intval', $excludeAbsenceIds),
+            static fn(int $id): bool => $id > 0
+        )));
+        if ($excludeAbsenceIds !== []) {
+            $sql .= ' AND id NOT IN (' . implode(',', array_fill(0, count($excludeAbsenceIds), '?')) . ')';
+            array_push($params, ...$excludeAbsenceIds);
         }
         $sql .= ' ORDER BY start_date, id';
         $st = $this->pdo->prepare($sql);

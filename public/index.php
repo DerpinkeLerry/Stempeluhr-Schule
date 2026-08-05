@@ -75,6 +75,9 @@ switch ($path) {
     case '/api/vacation-request/create':
         $controller->apiVacationRequestCreate();
         break;
+    case '/api/vacation-request/change':
+        $controller->apiVacationRequestChangeCreate();
+        break;
     case '/api/vacation-request/decision':
         $controller->apiVacationRequestDecision();
         break;

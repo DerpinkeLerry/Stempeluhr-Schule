@@ -1,6 +1,6 @@
-# Datenstruktur – Schema Version 3
+# Datenstruktur – Schema Version 4
 
-Die Anwendung verwendet SQLite. Die Schema-Version steht in `PRAGMA user_version` und ist aktuell `3`.
+Die Anwendung verwendet SQLite. Die Schema-Version steht in `PRAGMA user_version` und ist aktuell `4`.
 Beim ersten Start mit einer älteren Projektdatenbank führt `app/db.php` die strukturelle Migration automatisch aus. Vor einem produktiven Update muss trotzdem eine Dateikopie von `data/stempeluhr.sqlite` erstellt werden.
 
 ## Zentrale Tabellen
@@ -68,16 +68,19 @@ Urlaub, Krankheit, Schule und sonstige Abwesenheiten.
 `AM` und `PM` sind nur bei Urlaub und nur für ein einzelnes Datum erlaubt.
 
 ### `vacation_request`
-Dauerhaftes Archiv aller durch Mitarbeiter eingereichten Urlaubsanträge.
+Dauerhaftes Archiv aller durch Mitarbeiter eingereichten neuen Urlaubs-, Änderungs- und Löschanträge.
 
-- `start_date`, `end_date`, `portion`: beantragter Urlaubszeitraum
+- `request_type`: `CREATE`, `CHANGE` oder `DELETE`
+- `target_absence_id`: Verknüpfung zum bestehenden Urlaub, der geändert oder gelöscht werden soll
+- `original_start_date`, `original_end_date`, `original_portion`, `original_note`: unveränderlicher Stand des Urlaubs zum Zeitpunkt des Änderungsantrags
+- `start_date`, `end_date`, `portion`: gewünschter neuer Zeitraum; bei einer Löschung bleibt hier der betroffene ursprüngliche Zeitraum gespeichert
 - `note`: Hinweis des Mitarbeiters
 - `status`: `PENDING`, `APPROVED`, `REJECTED` oder `CANCELLED`
 - `requested_at`: Zeitpunkt der Antragstellung
 - `decided_at`, `decided_by`, `decision_note`: Entscheidung und Nachvollziehbarkeit
-- `absence_id`: optionale Verknüpfung zum erzeugten Urlaubseintrag
+- `absence_id`: optionale Verknüpfung zum erzeugten oder nach einer Änderung fortbestehenden Urlaubseintrag
 
-Bei einer Genehmigung wird ein Datensatz in `absence` angelegt. Wird dieser Urlaubseintrag später gelöscht, setzt SQLite nur `absence_id` auf `NULL`; der Antrag selbst bleibt im Archiv erhalten. Mitarbeiter werden in der Anwendung ausschließlich deaktiviert und nicht physisch gelöscht, damit auch deren Antragshistorie aufrufbar bleibt.
+Bei `CREATE` erzeugt eine Genehmigung einen Datensatz in `absence`. Bei `CHANGE` wird der bestehende Urlaub erst nach der Genehmigung verschoben. Bei `DELETE` bleibt der Urlaub bis zur Genehmigung unverändert und wird anschließend entfernt. Wird ein verknüpfter Urlaub gelöscht, setzt SQLite die direkten Verknüpfungen auf `NULL`; der ursprüngliche Zeitraum bleibt durch die Snapshot-Felder trotzdem vollständig im Archiv nachvollziehbar. Mitarbeiter werden in der Anwendung ausschließlich deaktiviert und nicht physisch gelöscht, damit auch deren Antragshistorie aufrufbar bleibt.
 
 ### `public_holiday`
 Gesetzliche Feiertage pro Region. Die vorhandene Region ist `DE-BY-KF`.

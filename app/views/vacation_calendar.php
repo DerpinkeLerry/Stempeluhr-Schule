@@ -9,6 +9,8 @@ $weekdayNames = [1 => 'Mo', 2 => 'Di', 3 => 'Mi', 4 => 'Do', 5 => 'Fr', 6 => 'Sa
 $portionLabels = ['FULL' => 'Ganzer Tag', 'AM' => 'Vormittag', 'PM' => 'Nachmittag'];
 $statusLabels = ['PENDING' => 'Offen', 'APPROVED' => 'Genehmigt', 'REJECTED' => 'Abgelehnt', 'CANCELLED' => 'Storniert'];
 $statusClasses = ['PENDING' => 'request-pending', 'APPROVED' => 'request-approved', 'REJECTED' => 'request-rejected', 'CANCELLED' => 'request-cancelled'];
+$requestTypeLabels = ['CREATE' => 'Neuer Urlaub', 'CHANGE' => 'Änderung', 'DELETE' => 'Löschung'];
+$requestTypeClasses = ['CREATE' => 'request-type-create', 'CHANGE' => 'request-type-change', 'DELETE' => 'request-type-delete'];
 
 $previousYear = $year - 1;
 $nextYear = $year + 1;
@@ -35,6 +37,17 @@ $periodLabel = static function (array $item) use ($portionLabels): string {
     $period = $start === $end ? $start : $start . ' – ' . $end;
     $portion = (string)($item['portion'] ?? 'FULL');
     return $period . ($portion !== 'FULL' ? ' · ' . ($portionLabels[$portion] ?? $portion) : '');
+};
+
+$originalPeriodLabel = static function (array $item) use ($periodLabel): string {
+    if (empty($item['original_start_date']) || empty($item['original_end_date'])) {
+        return '';
+    }
+    return $periodLabel([
+        'start_date' => (string)$item['original_start_date'],
+        'end_date' => (string)$item['original_end_date'],
+        'portion' => (string)($item['original_portion'] ?? 'FULL'),
+    ]);
 };
 
 $pendingOwnRequests = 0;
@@ -196,6 +209,10 @@ foreach ($monthNames as $monthNumber => $monthName) {
                 <button class="btn btn-brand" type="button" data-bs-toggle="modal" data-bs-target="#vacationRequestModal">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                     Urlaub beantragen
+                </button>
+                <button class="btn btn-outline-brand" type="button" data-bs-toggle="modal" data-bs-target="#vacationChangeRequestModal">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h11M4 7l3-3M4 7l3 3M20 17H9M20 17l-3-3M20 17l-3 3"/></svg>
+                    Urlaub ändern
                 </button>
             <?php endif; ?>
         </div>
@@ -540,8 +557,8 @@ foreach ($monthNames as $monthNumber => $monthName) {
         <div class="section-heading vacation-request-heading">
             <div>
                 <div class="eyebrow"><?= $isAdmin ? 'Dauerhaft gespeichert' : 'Mein Verlauf' ?></div>
-                <h2><?= $isAdmin ? 'Urlaubsanträge' : 'Meine Urlaubsanträge' ?></h2>
-                <p><?= $isAdmin ? 'Jeder Antrag bleibt mit Entscheidung und Bearbeitungszeitpunkt im Archiv erhalten.' : 'Hier sehen Sie den vollständigen Status Ihrer eingereichten Anträge.' ?></p>
+                <h2><?= $isAdmin ? 'Urlaubsanträge und Änderungen' : 'Meine Urlaubsanträge und Änderungen' ?></h2>
+                <p><?= $isAdmin ? 'Neue Urlaube, Verschiebungen und Löschwünsche bleiben mit Entscheidung und Bearbeitungszeitpunkt im Archiv erhalten.' : 'Hier sehen Sie den vollständigen Status Ihrer neuen Urlaubs- und Änderungsanträge.' ?></p>
             </div>
             <?php if ($isAdmin): ?>
                 <div class="request-filter-tabs" role="navigation" aria-label="Antragsstatus filtern">
@@ -558,19 +575,36 @@ foreach ($monthNames as $monthNumber => $monthName) {
                 $requestStatusCode = (string)$request['status'];
                 $statusLabel = $statusLabels[$requestStatusCode] ?? $requestStatusCode;
                 $statusClass = $statusClasses[$requestStatusCode] ?? 'request-cancelled';
+                $requestType = strtoupper((string)($request['request_type'] ?? 'CREATE'));
+                $requestTypeLabel = $requestTypeLabels[$requestType] ?? 'Urlaubsantrag';
+                $requestTypeClass = $requestTypeClasses[$requestType] ?? 'request-type-create';
+                $newPeriodLabel = $periodLabel($request);
+                $oldPeriodLabel = $originalPeriodLabel($request);
+                $requestDetail = match ($requestType) {
+                    'CHANGE' => $oldPeriodLabel . ' → ' . $newPeriodLabel,
+                    'DELETE' => $oldPeriodLabel . ' soll gelöscht werden',
+                    default => $newPeriodLabel,
+                };
                 ?>
                 <article class="vacation-request-item <?= h($statusClass) ?>">
                     <div class="request-status-rail" aria-hidden="true"></div>
                     <div class="request-main">
                         <div class="request-title-row">
                             <div>
-                                <?php if ($isAdmin): ?><strong><?= h((string)$request['employee_name']) ?></strong><?php else: ?><strong><?= h($periodLabel($request)) ?></strong><?php endif; ?>
-                                <?php if ($isAdmin): ?><span><?= h($periodLabel($request)) ?></span><?php endif; ?>
+                                <?php if ($isAdmin): ?><strong><?= h((string)$request['employee_name']) ?></strong><?php else: ?><strong><?= h($requestTypeLabel) ?></strong><?php endif; ?>
+                                <span><?= h($requestDetail) ?></span>
                             </div>
-                            <span class="request-status-badge <?= h($statusClass) ?>"><?= h($statusLabel) ?></span>
+                            <span class="request-badges">
+                                <span class="request-type-badge <?= h($requestTypeClass) ?>"><?= h($requestTypeLabel) ?></span>
+                                <span class="request-status-badge <?= h($statusClass) ?>"><?= h($statusLabel) ?></span>
+                            </span>
                         </div>
                         <div class="request-meta">
-                            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z"/></svg><?= h(number_format((float)$request['requested_days'], 1, ',', '.')) ?> Urlaubstage</span>
+                            <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z"/></svg>
+                                <?php if ($requestType === 'CHANGE'): ?>Neu <?= h(number_format((float)$request['requested_days'], 1, ',', '.')) ?> Tage · bisher <?= h(number_format((float)$request['original_days'], 1, ',', '.')) ?>
+                                <?php elseif ($requestType === 'DELETE'): ?><?= h(number_format((float)$request['original_days'], 1, ',', '.')) ?> Urlaubstage betroffen
+                                <?php else: ?><?= h(number_format((float)$request['requested_days'], 1, ',', '.')) ?> Urlaubstage<?php endif; ?>
+                            </span>
                             <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>Beantragt am <?= h(utc_to_local((string)$request['requested_at'], 'Europe/Berlin', 'd.m.Y H:i')) ?> Uhr</span>
                             <?php if (!empty($request['decided_at'])): ?>
                                 <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>Bearbeitet am <?= h(utc_to_local((string)$request['decided_at'], 'Europe/Berlin', 'd.m.Y H:i')) ?> Uhr<?= !empty($request['decided_by_name']) ? ' von ' . h((string)$request['decided_by_name']) : '' ?></span>
@@ -586,9 +620,14 @@ foreach ($monthNames as $monthNumber => $monthName) {
                             data-bs-toggle="modal"
                             data-bs-target="#vacationDecisionModal"
                             data-request-id="<?= (int)$request['id'] ?>"
+                            data-request-type="<?= h($requestType) ?>"
+                            data-request-type-label="<?= h($requestTypeLabel) ?>"
                             data-employee-name="<?= h((string)$request['employee_name']) ?>"
-                            data-period="<?= h($periodLabel($request)) ?>"
+                            data-period="<?= h($requestDetail) ?>"
+                            data-original-period="<?= h($oldPeriodLabel) ?>"
+                            data-new-period="<?= h($newPeriodLabel) ?>"
                             data-days="<?= h(number_format((float)$request['requested_days'], 1, ',', '.')) ?>"
+                            data-original-days="<?= h(number_format((float)$request['original_days'], 1, ',', '.')) ?>"
                             data-note="<?= h((string)$request['note']) ?>"
                         >Prüfen</button>
                     <?php endif; ?>
@@ -698,6 +737,7 @@ foreach ($monthNames as $monthNumber => $monthName) {
                 <div class="modal-body">
                     <input type="hidden" name="requestId">
                     <div class="decision-request-summary">
+                        <span id="vacationDecisionType" class="request-type-badge request-type-create">Neuer Urlaub</span>
                         <strong id="vacationDecisionEmployee"></strong>
                         <span id="vacationDecisionPeriod"></span>
                         <small id="vacationDecisionDays"></small>
@@ -705,7 +745,7 @@ foreach ($monthNames as $monthNumber => $monthName) {
                     </div>
                     <fieldset class="decision-options">
                         <legend>Entscheidung</legend>
-                        <label class="decision-option decision-approve"><input type="radio" name="decision" value="APPROVED" checked><span><strong>Genehmigen</strong><small>Der Urlaub wird sofort im Kalender eingetragen.</small></span></label>
+                        <label class="decision-option decision-approve"><input type="radio" name="decision" value="APPROVED" checked><span><strong>Genehmigen</strong><small id="vacationDecisionApproveText">Der Urlaub wird sofort im Kalender eingetragen.</small></span></label>
                         <label class="decision-option decision-reject"><input type="radio" name="decision" value="REJECTED"><span><strong>Ablehnen</strong><small>Der Antrag bleibt mit der Ablehnung im Archiv.</small></span></label>
                     </fieldset>
                     <label class="form-label" for="vacationDecisionNote">Begründung / Notiz</label>
@@ -741,6 +781,84 @@ foreach ($monthNames as $monthNumber => $monthName) {
                     <div class="vacation-balance-warning"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>Der Antrag wird gespeichert und bleibt auch nach der Entscheidung dauerhaft in Ihrem Verlauf sichtbar.</span></div>
                 </div>
                 <div class="modal-footer"><button type="button" class="btn btn-quiet" data-bs-dismiss="modal">Abbrechen</button><button class="btn btn-brand" type="submit">Antrag verbindlich senden</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="vacationChangeRequestModal" tabindex="-1" aria-labelledby="vacationChangeRequestModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div><div class="eyebrow">Bestehenden Urlaub</div><h2 class="modal-title" id="vacationChangeRequestModalLabel">Urlaub ändern</h2><p class="modal-subtitle">Verschiebung oder Löschung zur Genehmigung einreichen.</p></div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <form id="vacationChangeRequestForm">
+                <div class="modal-body">
+                    <?php if (!$editableVacations): ?>
+                        <div class="vacation-change-empty">
+                            <span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z"/><path d="m9 16 2 2 4-5"/></svg></span>
+                            <strong>Kein änderbarer Urlaub vorhanden</strong>
+                            <p>Hier erscheinen genehmigte Urlaube, die noch nicht begonnen haben.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="mb-3">
+                            <label class="form-label" for="vacationChangeTarget">Welcher Urlaub soll geändert werden?</label>
+                            <select class="form-select" id="vacationChangeTarget" name="target_absence_id" required>
+                                <option value="">Bitte auswählen</option>
+                                <?php foreach ($editableVacations as $vacation): ?>
+                                    <?php
+                                    $hasPendingChange = !empty($vacation['pending_change_request_id']);
+                                    $vacationOptionLabel = $periodLabel($vacation)
+                                        . ' · ' . number_format((float)$vacation['vacation_days'], 1, ',', '.') . ' Tage'
+                                        . ($hasPendingChange ? ' · Antrag bereits offen' : '');
+                                    ?>
+                                    <option
+                                        value="<?= (int)$vacation['id'] ?>"
+                                        data-start-date="<?= h((string)$vacation['start_date']) ?>"
+                                        data-end-date="<?= h((string)$vacation['end_date']) ?>"
+                                        data-portion="<?= h((string)$vacation['portion']) ?>"
+                                        data-period="<?= h($periodLabel($vacation)) ?>"
+                                        data-days="<?= h(number_format((float)$vacation['vacation_days'], 1, ',', '.')) ?>"
+                                        <?= $hasPendingChange ? 'disabled' : '' ?>
+                                    ><?= h($vacationOptionLabel) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <small class="form-text">Bereits begonnener oder vergangener Urlaub kann nicht mehr per Antrag geändert werden.</small>
+                        </div>
+
+                        <div id="vacationChangeCurrentSummary" class="vacation-change-current" hidden>
+                            <span>Aktuell genehmigt</span>
+                            <strong id="vacationChangeCurrentPeriod"></strong>
+                            <small id="vacationChangeCurrentDays"></small>
+                        </div>
+
+                        <fieldset class="vacation-change-actions">
+                            <legend>Was soll passieren?</legend>
+                            <label class="vacation-change-action is-change">
+                                <input type="radio" name="request_type" value="CHANGE" checked>
+                                <span><strong>Verschieben / ändern</strong><small>Neuen Zeitraum oder Tagesumfang beantragen.</small></span>
+                            </label>
+                            <label class="vacation-change-action is-delete">
+                                <input type="radio" name="request_type" value="DELETE">
+                                <span><strong>Urlaub löschen</strong><small>Der genehmigte Urlaub wird erst nach Zustimmung entfernt.</small></span>
+                            </label>
+                        </fieldset>
+
+                        <div id="vacationChangeFields" class="row g-3">
+                            <div class="col-sm-6"><label class="form-label" for="vacationChangeStart">Neuer Beginn</label><input class="form-control" id="vacationChangeStart" name="start_date" type="date" min="<?= h($today) ?>" required></div>
+                            <div class="col-sm-6"><label class="form-label" for="vacationChangeEnd">Neues Ende</label><input class="form-control" id="vacationChangeEnd" name="end_date" type="date" min="<?= h($today) ?>" required></div>
+                            <div class="col-12"><label class="form-label" for="vacationChangePortion">Neuer Umfang</label><select class="form-select" id="vacationChangePortion" name="portion"><option value="FULL">Ganzer Tag / Zeitraum</option><option value="AM">Vormittag</option><option value="PM">Nachmittag</option></select><small class="form-text">Halbe Tage sind nur für ein einzelnes Datum möglich.</small></div>
+                        </div>
+
+                        <div class="mt-3">
+                            <label class="form-label" for="vacationChangeNote">Begründung an die Administration</label>
+                            <textarea class="form-control" id="vacationChangeNote" name="note" rows="3" maxlength="300" required placeholder="Warum soll der Urlaub verschoben oder gelöscht werden?"></textarea>
+                        </div>
+                        <div class="vacation-balance-warning"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>Der bestehende Urlaub bleibt unverändert, bis die Administration den Antrag genehmigt. Der Antrag bleibt anschließend dauerhaft im Verlauf sichtbar.</span></div>
+                    <?php endif; ?>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-quiet" data-bs-dismiss="modal">Abbrechen</button><button class="btn btn-brand" type="submit" <?= !$editableVacations ? 'disabled' : '' ?>>Änderungsantrag senden</button></div>
             </form>
         </div>
     </div>

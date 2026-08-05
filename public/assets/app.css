@@ -4066,7 +4066,7 @@ div.vacation-year-board-bar[tabindex] {
     font-size: .84rem;
 }
 
-.request-title-row span:not(.request-status-badge) {
+.request-title-row > div > span {
     color: var(--wepro-muted);
     font-size: .68rem;
 }
@@ -4083,6 +4083,44 @@ div.vacation-year-board-bar[tabindex] {
     font-weight: 800;
     letter-spacing: .04em;
     text-transform: uppercase;
+}
+
+.request-badges {
+    display: inline-flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: .35rem;
+}
+
+.request-type-badge {
+    display: inline-flex;
+    align-items: center;
+    width: max-content;
+    min-height: 26px;
+    padding: .28rem .62rem;
+    border-radius: 999px;
+    background: var(--wepro-paper);
+    color: var(--wepro-navy-2);
+    font-size: .58rem;
+    font-weight: 800;
+    letter-spacing: .035em;
+    text-transform: uppercase;
+}
+
+.request-type-badge.request-type-create {
+    background: var(--wepro-info-soft);
+    color: var(--wepro-info);
+}
+
+.request-type-badge.request-type-change {
+    background: var(--wepro-warning-soft);
+    color: var(--wepro-warning);
+}
+
+.request-type-badge.request-type-delete {
+    background: var(--wepro-danger-soft);
+    color: var(--wepro-danger);
 }
 
 .request-status-badge.request-pending { background: var(--wepro-warning-soft); color: var(--wepro-warning); }
@@ -4234,6 +4272,141 @@ div.vacation-year-board-bar[tabindex] {
     stroke-width: 1.8;
     stroke-linecap: round;
     stroke-linejoin: round;
+}
+
+.vacation-change-empty {
+    display: grid;
+    justify-items: center;
+    gap: .35rem;
+    padding: 1.4rem 1rem;
+    border: 1px dashed var(--wepro-line-strong);
+    border-radius: 14px;
+    background: var(--wepro-paper);
+    text-align: center;
+}
+
+.vacation-change-empty > span {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    margin-bottom: .25rem;
+    border-radius: 14px;
+    background: var(--wepro-orange-soft);
+    color: var(--wepro-orange-strong);
+}
+
+.vacation-change-empty svg {
+    width: 23px;
+    height: 23px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.vacation-change-empty strong {
+    color: var(--wepro-navy);
+    font-size: .8rem;
+}
+
+.vacation-change-empty p {
+    margin: 0;
+    color: var(--wepro-muted);
+    font-size: .66rem;
+}
+
+.vacation-change-current {
+    display: grid;
+    gap: .1rem;
+    margin-bottom: 1rem;
+    padding: .8rem .9rem;
+    border: 1px solid var(--wepro-line);
+    border-left: 4px solid var(--wepro-orange);
+    border-radius: 12px;
+    background: var(--wepro-paper);
+}
+
+.vacation-change-current[hidden],
+#vacationChangeFields[hidden] {
+    display: none;
+}
+
+.vacation-change-current span,
+.vacation-change-current small {
+    color: var(--wepro-muted);
+    font-size: .62rem;
+}
+
+.vacation-change-current strong {
+    color: var(--wepro-navy);
+    font-size: .76rem;
+}
+
+.vacation-change-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .65rem;
+    margin: 0 0 1rem;
+    padding: 0;
+    border: 0;
+}
+
+.vacation-change-actions legend {
+    grid-column: 1 / -1;
+    margin: 0 0 .15rem;
+    color: var(--wepro-navy);
+    font-size: .7rem;
+    font-weight: 700;
+}
+
+.vacation-change-action {
+    display: flex;
+    align-items: flex-start;
+    gap: .6rem;
+    min-width: 0;
+    padding: .78rem;
+    border: 1px solid var(--wepro-line);
+    border-radius: 12px;
+    background: #fff;
+    cursor: pointer;
+    transition: border-color var(--wepro-transition), background var(--wepro-transition), box-shadow var(--wepro-transition);
+}
+
+.vacation-change-action:has(input:checked) {
+    border-color: var(--wepro-orange);
+    background: var(--wepro-orange-soft);
+    box-shadow: 0 0 0 3px rgba(255, 180, 50, .09);
+}
+
+.vacation-change-action.is-delete:has(input:checked) {
+    border-color: var(--wepro-danger);
+    background: var(--wepro-danger-soft);
+    box-shadow: 0 0 0 3px rgba(205, 66, 79, .08);
+}
+
+.vacation-change-action input {
+    flex: 0 0 auto;
+    margin-top: .18rem;
+    accent-color: var(--wepro-orange-strong);
+}
+
+.vacation-change-action span {
+    display: grid;
+    gap: .12rem;
+    min-width: 0;
+}
+
+.vacation-change-action strong {
+    color: var(--wepro-navy);
+    font-size: .7rem;
+}
+
+.vacation-change-action small {
+    color: var(--wepro-muted);
+    font-size: .59rem;
+    line-height: 1.4;
 }
 
 .modal-footer-split {
@@ -4538,6 +4711,14 @@ div.vacation-year-board-bar[tabindex] {
 
     .request-status-badge {
         align-self: flex-start;
+    }
+
+    .request-badges {
+        justify-content: flex-start;
+    }
+
+    .vacation-change-actions {
+        grid-template-columns: 1fr;
     }
 
     .modal-footer-split {

@@ -205,3 +205,15 @@ Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.
 - Der Tageskopf selbst erhält weder Hover-Hintergrund noch Auswahlrahmen und bleibt dadurch optisch ruhig.
 - Auch während einer Bereichsauswahl wird die Markierung nur in der eigentlichen Kalenderfläche dargestellt.
 - Tastaturauswahl über Eingabe- oder Leertaste markiert ebenfalls nur das darunterliegende Tagesfeld.
+
+## 05.08.2026 – Änderungs- und Löschanträge für bestehenden Urlaub
+
+- Mitarbeiter erhalten neben „Urlaub beantragen“ die neue Aktion **„Urlaub ändern“**.
+- Noch nicht begonnene, genehmigte Urlaube können zur Verschiebung, Änderung des Tagesumfangs oder Löschung eingereicht werden.
+- Der bestehende Urlaub bleibt bis zur Entscheidung der Administration vollständig unverändert.
+- Pro Urlaub ist höchstens ein offener Änderungs- oder Löschantrag möglich.
+- Die Administration sieht Antragstyp, ursprünglichen Zeitraum, gewünschten neuen Zeitraum, betroffene Urlaubstage und Begründung direkt im gemeinsamen Antragsarchiv.
+- Genehmigte Verschiebungen aktualisieren den vorhandenen Urlaubseintrag; genehmigte Löschungen entfernen ihn aus dem Kalender.
+- Bei zwischenzeitlich direkt geändertem oder gelöschtem Urlaub wird eine veraltete Genehmigung blockiert, damit keine Daten unbeabsichtigt überschrieben werden.
+- Ursprünglicher Zeitraum, Umfang, Notiz, Entscheidung und Bearbeitungszeitpunkt bleiben dauerhaft gespeichert, auch wenn der Urlaub später gelöscht wird.
+- Datenbankschema auf `PRAGMA user_version = 4` angehoben; vorhandene Version-3-Datenbanken werden beim ersten Start automatisch erweitert.
