@@ -3556,32 +3556,138 @@ div.vacation-year-board-bar[tabindex] {
 .calendar-filter-empty span { color: var(--wepro-muted); font-size: .7rem; }
 
 .vacation-accounts-card {
-    margin-bottom: 1.5rem;
+    max-width: 1440px;
+    margin: 0 auto 1.5rem;
+    background: linear-gradient(180deg, #fff 0, #f8fafc 100%);
 }
 
 .vacation-account-heading {
     align-items: center;
+    padding: 1rem 1.1rem;
+    background:
+        linear-gradient(110deg, rgba(255, 180, 50, .09), transparent 38%),
+        linear-gradient(180deg, #fff, #fbfcfe);
+}
+
+.vacation-account-title {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    min-width: 0;
+}
+
+.vacation-account-title-icon {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border: 1px solid rgba(255, 180, 50, .22);
+    border-radius: 12px;
+    background: var(--wepro-orange-soft);
+    color: var(--wepro-orange-strong);
+}
+
+.vacation-account-title-icon svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.vacation-account-heading h2 {
+    font-size: 1rem;
 }
 
 .vacation-account-heading p {
-    max-width: 760px;
-    margin: .25rem 0 0;
+    margin: .08rem 0 0;
     color: var(--wepro-muted);
-    font-size: .7rem;
+    font-size: .65rem;
 }
 
+.vacation-account-heading-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: .45rem;
+}
+
+.vacation-account-count,
 .vacation-account-cutoff {
     display: inline-flex;
     align-items: center;
-    min-height: 34px;
-    padding: .45rem .72rem;
-    border: 1px solid rgba(199, 131, 22, .2);
+    min-height: 30px;
+    padding: .35rem .62rem;
     border-radius: 999px;
+    font-size: .58rem;
+    font-weight: 750;
+    white-space: nowrap;
+}
+
+.vacation-account-count {
+    border: 1px solid rgba(57, 115, 168, .18);
+    background: var(--wepro-info-soft);
+    color: var(--wepro-info);
+}
+
+.vacation-account-cutoff {
+    border: 1px solid rgba(199, 131, 22, .2);
     background: var(--wepro-warning-soft);
     color: var(--wepro-warning);
-    font-size: .62rem;
-    font-weight: 700;
-    white-space: nowrap;
+}
+
+.vacation-account-table-shell {
+    max-height: 410px;
+    margin: .75rem;
+    overflow: auto;
+    border: 1px solid var(--wepro-line);
+    border-radius: 14px;
+    background: #f7f9fc;
+    scrollbar-gutter: stable;
+}
+
+.vacation-account-table {
+    min-width: 850px;
+    table-layout: fixed;
+}
+
+.vacation-account-table th:first-child { width: 31%; }
+.vacation-account-table th:nth-child(2) { width: 13%; }
+.vacation-account-table th:nth-child(3) { width: 15%; }
+.vacation-account-table th:nth-child(4) { width: 13%; }
+.vacation-account-table th:nth-child(5) { width: 22%; }
+.vacation-account-table th:last-child { width: 6%; }
+
+.vacation-account-table > :not(caption) > * > * {
+    padding: .52rem .72rem;
+    border-color: rgba(210, 217, 226, .72);
+}
+
+.vacation-account-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    padding-top: .55rem;
+    padding-bottom: .55rem;
+    background: #edf2f7;
+    color: #6b7a8d;
+    box-shadow: 0 1px 0 var(--wepro-line-strong);
+}
+
+.vacation-account-table tbody tr {
+    background: rgba(255, 255, 255, .88);
+}
+
+.vacation-account-table tbody tr:nth-child(even) {
+    background: rgba(241, 245, 249, .9);
+}
+
+.vacation-account-table tbody tr:hover {
+    background: #fff7e8;
 }
 
 .vacation-account-table th:not(:first-child),
@@ -3589,23 +3695,127 @@ div.vacation-year-board-bar[tabindex] {
     white-space: nowrap;
 }
 
+.vacation-account-identity {
+    display: flex;
+    align-items: center;
+    gap: .58rem;
+    min-width: 0;
+}
+
+.vacation-account-avatar {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid color-mix(in srgb, var(--account-color) 30%, #fff);
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--account-color) 14%, #fff);
+    color: color-mix(in srgb, var(--account-color) 82%, #16243b);
+    font-size: .56rem;
+    font-weight: 800;
+    transition: transform var(--wepro-transition), box-shadow var(--wepro-transition);
+}
+
+.vacation-account-table tbody tr:hover .vacation-account-avatar {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 12px color-mix(in srgb, var(--account-color) 18%, transparent);
+}
+
 .vacation-account-person {
     display: grid;
-    gap: .06rem;
+    min-width: 0;
+    gap: 0;
 }
 
 .vacation-account-person strong {
+    overflow: hidden;
     color: var(--wepro-navy);
-    font-size: .73rem;
+    font-size: .68rem;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .vacation-account-person small {
+    overflow: hidden;
     color: var(--wepro-muted);
-    font-size: .61rem;
+    font-size: .55rem;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.account-metric {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 58px;
+    min-height: 26px;
+    padding: .25rem .45rem;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-size: .62rem;
+    font-weight: 720;
+}
+
+.account-entitlement {
+    border-color: rgba(57, 115, 168, .14);
+    background: var(--wepro-info-soft);
+    color: var(--wepro-info);
+}
+
+.account-carryover {
+    border-color: rgba(139, 92, 246, .13);
+    background: #f1edff;
+    color: #7250c8;
+}
+
+.account-used {
+    border-color: rgba(199, 131, 22, .14);
+    background: var(--wepro-warning-soft);
+    color: #a76e13;
+}
+
+.account-balance {
+    display: grid;
+    gap: .28rem;
+    min-width: 118px;
+}
+
+.account-balance-label {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .45rem;
+}
+
+.account-balance-label small {
+    color: var(--wepro-muted);
+    font-size: .52rem;
+    font-weight: 650;
+}
+
+.account-balance-track {
+    display: block;
+    height: 5px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e2e8ef;
+}
+
+.account-balance-track > span {
+    display: block;
+    width: var(--remaining-share);
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--account-color), var(--wepro-success));
+    transition: width 240ms ease;
 }
 
 .account-remaining-value {
     color: var(--wepro-success);
+    font-size: .68rem;
 }
 
 .account-remaining-value.is-empty {
@@ -3614,15 +3824,46 @@ div.vacation-year-board-bar[tabindex] {
 
 .account-expired-label {
     display: inline-flex;
-    margin-left: .3rem;
-    padding: .18rem .38rem;
+    margin-left: .25rem;
+    padding: .14rem .3rem;
     border-radius: 999px;
     background: var(--wepro-danger-soft);
     color: var(--wepro-danger);
-    font-size: .52rem;
+    font-size: .45rem;
     font-weight: 800;
     letter-spacing: .03em;
     text-transform: uppercase;
+}
+
+.vacation-account-open {
+    display: inline-grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--wepro-line-strong);
+    border-radius: 9px;
+    background: #fff;
+    color: var(--wepro-navy-2);
+    text-decoration: none;
+    transition: border-color var(--wepro-transition), background var(--wepro-transition), color var(--wepro-transition), transform var(--wepro-transition);
+}
+
+.vacation-account-open:hover,
+.vacation-account-open:focus-visible {
+    border-color: var(--wepro-orange);
+    background: var(--wepro-orange-soft);
+    color: var(--wepro-orange-strong);
+    transform: translateX(1px);
+}
+
+.vacation-account-open svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .vacation-requests-card {
@@ -4097,8 +4338,16 @@ div.vacation-year-board-bar[tabindex] {
         flex-direction: column;
     }
 
+    .vacation-account-heading-meta {
+        justify-content: flex-start;
+    }
+
     .vacation-account-cutoff {
         align-self: flex-start;
+    }
+
+    .vacation-account-table-shell {
+        margin: .6rem;
     }
 
     .request-filter-tabs {

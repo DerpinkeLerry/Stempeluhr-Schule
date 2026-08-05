@@ -162,3 +162,12 @@ Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.
 - Monatsbezeichnungen sind nicht mehr anklickbar; die frühere Monatsdetailansicht wurde aus der Oberfläche entfernt.
 - Jahresnavigation, Suche, Mitarbeiterfarben, Antragsverwaltung und Urlaubsbearbeitung bleiben erhalten.
 
+
+## 05.08.2026 – Urlaubskonten kompakter gestaltet
+
+- Die Urlaubskonten wurden als deutlich kompaktere, zentrierte Übersicht neu gestaltet.
+- Die Kontoliste besitzt eine begrenzte Höhe mit internem Scrollbereich und feststehender Tabellenüberschrift.
+- Dezente Wechselzeilen, farbige Kennzahlen und Mitarbeiter-Avatare verbessern die schnelle Zuordnung.
+- Der verfügbare Resturlaub wird zusätzlich als kompakter Fortschrittsbalken dargestellt.
+- Die breite Textschaltfläche wurde durch eine platzsparende Pfeilaktion ersetzt.
+- Anspruch, Übertrag, genommene und verfügbare Tage bleiben vollständig sichtbar und funktional unverändert.

@@ -391,16 +391,32 @@ foreach ($monthNames as $monthNumber => $monthName) {
     </section>
 
     <?php if ($isAdmin): ?>
+        <?php
+        $visibleVacationAccountCount = 0;
+        foreach ($employees as $employee) {
+            if (isset($vacationAccounts[(int)$employee['id']])) {
+                $visibleVacationAccountCount++;
+            }
+        }
+        ?>
         <section class="surface-card vacation-accounts-card">
             <div class="section-heading table-heading vacation-account-heading">
-                <div>
-                    <div class="eyebrow">Kontostände <?= (int)$year ?></div>
-                    <h2>Urlaubskonten der aktiven Mitarbeiter</h2>
-                    <p>Anspruch, automatisch übertragener Resturlaub, bereits genommene Tage und aktuell verfügbarer Bestand auf einen Blick.</p>
+                <div class="vacation-account-title">
+                    <span class="vacation-account-title-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-3"/></svg>
+                    </span>
+                    <div>
+                        <div class="eyebrow">Kontostände <?= (int)$year ?></div>
+                        <h2>Urlaubskonten</h2>
+                        <p>Kompakte Übersicht aller aktiven Mitarbeiter.</p>
+                    </div>
                 </div>
-                <span class="vacation-account-cutoff">Übertrag verfällt am 31.03.<?= (int)$year ?></span>
+                <div class="vacation-account-heading-meta">
+                    <span class="vacation-account-count"><?= (int)$visibleVacationAccountCount ?> Konten</span>
+                    <span class="vacation-account-cutoff">Übertrag verfällt am 31.03.<?= (int)$year ?></span>
+                </div>
             </div>
-            <div class="table-responsive">
+            <div class="vacation-account-table-shell">
                 <table class="table vacation-account-table align-middle mb-0">
                     <thead>
                     <tr>
@@ -408,31 +424,57 @@ foreach ($monthNames as $monthNumber => $monthName) {
                         <th class="text-end">Anspruch</th>
                         <th class="text-end">Übertrag</th>
                         <th class="text-end">Genommen</th>
-                        <th class="text-end">Verfügbar</th>
-                        <th class="text-end"><span class="visually-hidden">Öffnen</span></th>
+                        <th>Verfügbar</th>
+                        <th class="text-end"><span class="visually-hidden">Urlaubskonto öffnen</span></th>
                     </tr>
                     </thead>
                     <tbody>
                     <?php foreach ($employees as $employee): ?>
-                        <?php $account = $vacationAccounts[(int)$employee['id']] ?? null; ?>
-                        <?php if (!$account) continue; ?>
-                        <tr>
+                        <?php
+                        $employeeId = (int)$employee['id'];
+                        $account = $vacationAccounts[$employeeId] ?? null;
+                        if (!$account) continue;
+
+                        $entitlement = (float)$account['entitlement_days'] + (float)$account['adjustment_days'];
+                        $carryover = (float)$account['carryover_days'];
+                        $used = (float)$account['used_days'];
+                        $remaining = (float)$account['remaining_days'];
+                        $balanceBase = max(0.0, $used + max(0.0, $remaining));
+                        $remainingShare = $balanceBase > 0 ? max(0.0, min(100.0, ($remaining / $balanceBase) * 100)) : 0.0;
+                        $employeeColor = $employeeColorById[$employeeId] ?? '#2F6FED';
+                        ?>
+                        <tr style="--account-color: <?= h($employeeColor) ?>; --remaining-share: <?= h(number_format($remainingShare, 2, '.', '')) ?>%">
                             <td>
-                                <span class="vacation-account-person">
-                                    <strong><?= h((string)$employee['name']) ?></strong>
-                                    <small><?= h((string)($employee['department'] ?: 'Ohne Abteilung')) ?></small>
+                                <span class="vacation-account-identity">
+                                    <span class="vacation-account-avatar" aria-hidden="true"><?= h($employeeInitials((string)$employee['name'])) ?></span>
+                                    <span class="vacation-account-person">
+                                        <strong><?= h((string)$employee['name']) ?></strong>
+                                        <small><?= h((string)($employee['department'] ?: 'Ohne Abteilung')) ?></small>
+                                    </span>
                                 </span>
                             </td>
-                            <td class="text-end"><?= h(number_format((float)$account['entitlement_days'] + (float)$account['adjustment_days'], 1, ',', '.')) ?> T</td>
+                            <td class="text-end"><span class="account-metric account-entitlement"><?= h(number_format($entitlement, 1, ',', '.')) ?> T</span></td>
                             <td class="text-end">
-                                <?= h(number_format((float)$account['carryover_days'], 1, ',', '.')) ?> T
+                                <span class="account-metric account-carryover"><?= h(number_format($carryover, 1, ',', '.')) ?> T</span>
                                 <?php if ((float)$account['expired_carryover_days'] > 0): ?>
                                     <span class="account-expired-label" title="Nicht genutzter Übertrag ist nach dem 31.03. verfallen">verfallen</span>
                                 <?php endif; ?>
                             </td>
-                            <td class="text-end"><?= h(number_format((float)$account['used_days'], 1, ',', '.')) ?> T</td>
-                            <td class="text-end"><strong class="account-remaining-value<?= (float)$account['remaining_days'] <= 0 ? ' is-empty' : '' ?>"><?= h(number_format((float)$account['remaining_days'], 1, ',', '.')) ?> T</strong></td>
-                            <td class="text-end"><a class="btn btn-table-action" href="<?= h(url('/employee?id=' . (int)$employee['id'] . '&vacation_year=' . $year . '#vacation-account')) ?>">Öffnen</a></td>
+                            <td class="text-end"><span class="account-metric account-used"><?= h(number_format($used, 1, ',', '.')) ?> T</span></td>
+                            <td>
+                                <span class="account-balance">
+                                    <span class="account-balance-label">
+                                        <strong class="account-remaining-value<?= $remaining <= 0 ? ' is-empty' : '' ?>"><?= h(number_format($remaining, 1, ',', '.')) ?> T</strong>
+                                        <small><?= h(number_format($remainingShare, 0, ',', '.')) ?> % frei</small>
+                                    </span>
+                                    <span class="account-balance-track" aria-hidden="true"><span></span></span>
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <a class="vacation-account-open" href="<?= h(url('/employee?id=' . $employeeId . '&vacation_year=' . $year . '#vacation-account')) ?>" aria-label="Urlaubskonto von <?= h((string)$employee['name']) ?> öffnen" title="Urlaubskonto öffnen">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                                </a>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>
