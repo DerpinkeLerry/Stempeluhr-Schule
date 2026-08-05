@@ -115,6 +115,18 @@ $tests['Speichern wird bei unzureichendem Urlaub blockiert'] = static function (
     vacationAssertSame(0, (int)$pdo->query('SELECT COUNT(*) FROM vacation_request')->fetchColumn(), 'Der blockierte Antrag darf nicht gespeichert werden');
 };
 
+$tests['Wochenenden werden auch bei hinterlegten Wochenendstunden nie als Urlaub berechnet'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = vacationTestContext('2026-08-05 08:00:00');
+    $service->updateSchedule($employeeId, '2026-01-01', [1 => 8, 2 => 8, 3 => 8, 4 => 8, 5 => 8, 6 => 8, 7 => 8]);
+    $service->updateVacationAccount($employeeId, 2026, 6, 0, 0);
+
+    $service->createAbsence($employeeId, 'VACATION', '2026-08-03', '2026-08-10');
+    $account = $service->getVacationAccount($employeeId, 2026, '2026-08-10');
+
+    vacationAssertSame(6.0, (float)$account['used_days'], 'Montag bis zum folgenden Montag darf nur sechs Werktage verbrauchen');
+    vacationAssertSame(0.0, (float)$account['remaining_days'], 'Samstag und Sonntag dürfen das Urlaubskonto nicht zusätzlich belasten');
+};
+
 $tests['Genehmigte und abgelehnte Anträge bleiben dauerhaft im Archiv'] = static function (): void {
     [$pdo, $service, &$clock, $employeeId, $adminId] = vacationTestContext('2026-08-05 08:00:00');
     $service->updateVacationAccount($employeeId, 2026, 10, 0, 0);

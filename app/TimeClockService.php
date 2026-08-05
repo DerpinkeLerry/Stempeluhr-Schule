@@ -1780,7 +1780,8 @@ final class TimeClockService
         $byYear = [];
         while ($current <= $last) {
             $day = $current->format('Y-m-d');
-            if ($this->getScheduledMinutesForDate($employeeId, $day) > 0 && !$this->isHoliday($region, $day)) {
+            $isWeekday = (int)$current->format('N') <= 5;
+            if ($isWeekday && $this->getScheduledMinutesForDate($employeeId, $day) > 0 && !$this->isHoliday($region, $day)) {
                 $year = (int)$current->format('Y');
                 $fraction = $portion === 'FULL' ? 1.0 : 0.5;
                 $bucket = $day <= sprintf('%04d-03-31', $year) ? 'early_days' : 'late_days';
@@ -1821,7 +1822,8 @@ final class TimeClockService
             $last = new DateTimeImmutable($end . ' 00:00:00', new DateTimeZone('UTC'));
             while ($current <= $last) {
                 $day = $current->format('Y-m-d');
-                if ($this->getScheduledMinutesForDate($employeeId, $day) > 0 && !$this->isHoliday($region, $day)) {
+                $isWeekday = (int)$current->format('N') <= 5;
+                if ($isWeekday && $this->getScheduledMinutesForDate($employeeId, $day) > 0 && !$this->isHoliday($region, $day)) {
                     $portion = (string)($absence['portion'] ?? 'FULL');
                     $fraction = $portion === 'FULL' ? 1.0 : 0.5;
                     $fractions[$day] = max($fractions[$day] ?? 0.0, $fraction);

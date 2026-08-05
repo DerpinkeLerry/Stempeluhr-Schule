@@ -171,3 +171,12 @@ Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.
 - Der verfügbare Resturlaub wird zusätzlich als kompakter Fortschrittsbalken dargestellt.
 - Die breite Textschaltfläche wurde durch eine platzsparende Pfeilaktion ersetzt.
 - Anspruch, Übertrag, genommene und verfügbare Tage bleiben vollständig sichtbar und funktional unverändert.
+
+## 05.08.2026 – Wochenenden im Urlaubskalender freigehalten
+
+- Samstage und Sonntage werden serverseitig grundsätzlich nicht als Urlaubstage berechnet und im Jahresplan sichtbar freigehalten.
+- Mehrtägige Urlaubsbalken werden an Samstagen und Sonntagen sichtbar unterbrochen.
+- Ein Zeitraum von Montag bis zum folgenden Montag erscheint deshalb als Montag bis Freitag und anschließend separat am nächsten Montag.
+- Im Kalender markierte Feiertage bleiben ebenfalls frei, da sie nicht vom Urlaubskonto abgezogen werden.
+- Ein Urlaubseintrag bleibt trotz mehrerer sichtbarer Teilbalken ein einzelner Datensatz und kann über jeden Teilbalken vollständig bearbeitet werden.
+- Monatsstatistiken zählen weiterhin Urlaubseinträge und nicht die durch Wochenenden entstehenden Teilsegmente.

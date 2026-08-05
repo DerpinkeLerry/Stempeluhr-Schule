@@ -96,6 +96,7 @@ foreach ($monthNames as $monthNumber => $monthName) {
 
     $segments = [];
     $monthEmployeeIds = [];
+    $monthVacationIds = [];
     foreach ($vacations as $vacation) {
         $employeeId = (int)$vacation['employee_id'];
         if (!isset($employeeById[$employeeId])) {
@@ -107,27 +108,35 @@ foreach ($monthNames as $monthNumber => $monthName) {
 
         $clipStart = max((string)$vacation['start_date'], $matrixMonthStart);
         $clipEnd = min((string)$vacation['end_date'], $matrixMonthEnd);
-        $startDay = (int)date('j', strtotime($clipStart));
-        $endDay = (int)date('j', strtotime($clipEnd));
-        $span = $endDay - $startDay + 1;
+        $workdaySegments = vacation_calendar_workday_segments($clipStart, $clipEnd, $holidaysByDay);
+        if ($workdaySegments === []) {
+            continue;
+        }
+
         $employee = $employeeById[$employeeId];
         $name = (string)$employee['name'];
         $portion = (string)($vacation['portion'] ?? 'FULL');
-        $segments[] = [
-            'vacation' => $vacation,
-            'employee' => $employee,
-            'employee_id' => $employeeId,
-            'search' => trim($name . ' ' . (string)$employee['department'] . ' ' . (string)$employee['personnel_number']),
-            'color' => $employeeColorById[$employeeId],
-            'initials' => $employeeInitials($name),
-            'start_day' => $startDay,
-            'end_day' => $endDay,
-            'span' => $span,
-            'portion' => $portion,
-            'period_label' => $periodLabel($vacation),
-            'bar_label' => $span >= 4 ? $name : $employeeInitials($name),
-        ];
+        $vacationId = (int)$vacation['id'];
+        $monthVacationIds[$vacationId] = true;
         $monthEmployeeIds[$employeeId] = true;
+
+        foreach ($workdaySegments as $workdaySegment) {
+            $span = (int)$workdaySegment['span'];
+            $segments[] = [
+                'vacation' => $vacation,
+                'employee' => $employee,
+                'employee_id' => $employeeId,
+                'search' => trim($name . ' ' . (string)$employee['department'] . ' ' . (string)$employee['personnel_number']),
+                'color' => $employeeColorById[$employeeId],
+                'initials' => $employeeInitials($name),
+                'start_day' => (int)$workdaySegment['start_day'],
+                'end_day' => (int)$workdaySegment['end_day'],
+                'span' => $span,
+                'portion' => $portion,
+                'period_label' => $periodLabel($vacation),
+                'bar_label' => $span >= 4 ? $name : $employeeInitials($name),
+            ];
+        }
     }
 
     usort($segments, static function (array $a, array $b): int {
@@ -157,7 +166,7 @@ foreach ($monthNames as $monthNumber => $monthName) {
         'days' => $matrixDays,
         'segments' => $segments,
         'track_count' => max(1, count($trackEndDays)),
-        'vacation_count' => count($segments),
+        'vacation_count' => count($monthVacationIds),
         'employee_count' => count($monthEmployeeIds),
         'is_current' => $year === (int)date('Y', strtotime($today))
             && $monthNumber === (int)date('n', strtotime($today)),

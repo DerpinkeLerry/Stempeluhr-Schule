@@ -147,3 +147,71 @@ function utc_to_local(?string $utc, string $timezone, string $format = 'd.m.Y H:
     $date = new DateTimeImmutable($utc, new DateTimeZone('UTC'));
     return $date->setTimezone(new DateTimeZone($timezone))->format($format);
 }
+
+/**
+ * Splits a date range into contiguous Monday-to-Friday segments for the
+ * vacation planning board. Dates contained in $excludedDates (for example
+ * public holidays) are left blank as well.
+ *
+ * @param array<string, mixed> $excludedDates Date map keyed by YYYY-MM-DD.
+ * @return array<int, array{start_date:string,end_date:string,start_day:int,end_day:int,span:int}>
+ */
+function vacation_calendar_workday_segments(string $startDate, string $endDate, array $excludedDates = []): array
+{
+    $timezone = new DateTimeZone('UTC');
+    $start = DateTimeImmutable::createFromFormat('!Y-m-d', $startDate, $timezone);
+    $end = DateTimeImmutable::createFromFormat('!Y-m-d', $endDate, $timezone);
+
+    if (
+        $start === false
+        || $end === false
+        || $start->format('Y-m-d') !== $startDate
+        || $end->format('Y-m-d') !== $endDate
+        || $start > $end
+    ) {
+        return [];
+    }
+
+    $segments = [];
+    $segmentStart = null;
+    $previousDate = null;
+
+    for ($current = $start; $current <= $end; $current = $current->modify('+1 day')) {
+        $date = $current->format('Y-m-d');
+        $isWeekday = (int)$current->format('N') <= 5;
+        $isExcluded = array_key_exists($date, $excludedDates);
+        $isVisibleWorkday = $isWeekday && !$isExcluded;
+
+        if ($isVisibleWorkday) {
+            if ($segmentStart === null) {
+                $segmentStart = $current;
+            }
+            $previousDate = $current;
+            continue;
+        }
+
+        if ($segmentStart !== null && $previousDate !== null) {
+            $segments[] = [
+                'start_date' => $segmentStart->format('Y-m-d'),
+                'end_date' => $previousDate->format('Y-m-d'),
+                'start_day' => (int)$segmentStart->format('j'),
+                'end_day' => (int)$previousDate->format('j'),
+                'span' => ((int)$segmentStart->diff($previousDate)->format('%a')) + 1,
+            ];
+            $segmentStart = null;
+            $previousDate = null;
+        }
+    }
+
+    if ($segmentStart !== null && $previousDate !== null) {
+        $segments[] = [
+            'start_date' => $segmentStart->format('Y-m-d'),
+            'end_date' => $previousDate->format('Y-m-d'),
+            'start_day' => (int)$segmentStart->format('j'),
+            'end_day' => (int)$previousDate->format('j'),
+            'span' => ((int)$segmentStart->diff($previousDate)->format('%a')) + 1,
+        ];
+    }
+
+    return $segments;
+}
