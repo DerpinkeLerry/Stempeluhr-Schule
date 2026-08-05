@@ -187,26 +187,16 @@ final class Controller
         $isAdmin = ($_SESSION['role'] ?? '') === 'admin';
         $berlinNow = new DateTimeImmutable('now', new DateTimeZone('Europe/Berlin'));
         $currentYear = (int)$berlinNow->format('Y');
-        $currentMonth = (int)$berlinNow->format('n');
-        $viewMode = strtolower((string)($_GET['view'] ?? 'year'));
-        if (!in_array($viewMode, ['month', 'year'], true)) {
-            $viewMode = 'year';
-        }
         $year = (int)($_GET['year'] ?? $currentYear);
-        $month = (int)($_GET['month'] ?? $currentMonth);
         if ($year < 1970 || $year > 2200) {
             $year = $currentYear;
         }
-        if ($month < 1 || $month > 12) {
-            $month = $currentMonth;
-        }
 
-        $monthStart = sprintf('%04d-%02d-01', $year, $month);
-        $monthEnd = (new DateTimeImmutable($monthStart . ' 00:00:00', new DateTimeZone('UTC')))
-            ->modify('last day of this month')
-            ->format('Y-m-d');
-        $periodStart = $viewMode === 'year' ? sprintf('%04d-01-01', $year) : $monthStart;
-        $periodEnd = $viewMode === 'year' ? sprintf('%04d-12-31', $year) : $monthEnd;
+        // Der Urlaubsplan ist bewusst eine reine Jahresübersicht. Frühere
+        // view-/month-Parameter werden ignoriert, damit es nur eine eindeutige
+        // Kalenderdarstellung und stabile Links gibt.
+        $periodStart = sprintf('%04d-01-01', $year);
+        $periodEnd = sprintf('%04d-12-31', $year);
         $employees = $this->service->listActiveEmployeesForVacationCalendar();
         $vacations = $this->service->listVacationAbsencesForPeriod($periodStart, $periodEnd);
         $vacationsByEmployee = [];
@@ -222,12 +212,6 @@ final class Controller
         }
 
         $today = $berlinNow->format('Y-m-d');
-        $awayToday = [];
-        foreach ($vacations as $vacation) {
-            if ((string)$vacation['start_date'] <= $today && (string)$vacation['end_date'] >= $today) {
-                $awayToday[(int)$vacation['employee_id']] = true;
-            }
-        }
 
         $vacationAccounts = [];
         if ($isAdmin) {
@@ -260,12 +244,7 @@ final class Controller
 
         $this->render('vacation_calendar', compact(
             'isAdmin',
-            'currentUserId',
-            'viewMode',
             'year',
-            'month',
-            'monthStart',
-            'monthEnd',
             'periodStart',
             'periodEnd',
             'employees',
@@ -273,7 +252,6 @@ final class Controller
             'vacationsByEmployee',
             'holidaysByDay',
             'today',
-            'awayToday',
             'vacationAccounts',
             'ownVacationAccount',
             'requests',

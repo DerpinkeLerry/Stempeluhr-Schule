@@ -703,7 +703,6 @@
     if (vacationCalendarRoot) {
         const employeeSearch = document.getElementById('vacationEmployeeSearch');
         const hideFree = document.getElementById('vacationHideFree');
-        const employeeRows = Array.from(document.querySelectorAll('[data-employee-row]'));
         const yearMatrix = vacationCalendarRoot.querySelector('[data-year-matrix]');
         const yearMonthRows = Array.from(document.querySelectorAll('[data-year-month-row]'));
         const vacationEntries = Array.from(document.querySelectorAll('[data-vacation-entry]'));
@@ -712,47 +711,36 @@
         const calendarEmpty = document.getElementById('vacationCalendarEmpty');
 
         const filterVacationRows = () => {
+            if (!yearMatrix) return;
+
             const query = normalizeSearch(employeeSearch?.value || '');
             const onlyWithVacation = Boolean(hideFree?.checked);
+            let visibleMonths = 0;
+            let visibleEntries = 0;
 
-            if (yearMatrix) {
-                let visibleMonths = 0;
-                let visibleEntries = 0;
-
-                vacationEntries.forEach(entry => {
-                    const matches = !query || normalizeSearch(entry.dataset.search || '').includes(query);
-                    entry.hidden = !matches;
-                    entry.classList.toggle('is-muted', false);
-                    if (matches) visibleEntries++;
-                });
-
-                yearMonthRows.forEach(row => {
-                    const matchingEntries = Array.from(row.querySelectorAll('[data-vacation-entry]')).filter(entry => !entry.hidden).length;
-                    const hideBecauseSearch = Boolean(query) && matchingEntries === 0;
-                    const hideBecauseEmpty = onlyWithVacation && matchingEntries === 0;
-                    row.hidden = hideBecauseSearch || hideBecauseEmpty;
-                    if (!row.hidden) visibleMonths++;
-                });
-
-                employeeLegendItems.forEach(item => {
-                    const matchesSearch = !query || normalizeSearch(item.dataset.search || '').includes(query);
-                    const matchesVacation = !onlyWithVacation || item.dataset.hasVacation === '1';
-                    item.hidden = !(matchesSearch && matchesVacation);
-                    item.classList.toggle('is-active', Boolean(query) && normalizeSearch(item.dataset.employeeFilter || '') === query);
-                });
-
-                if (calendarEmpty) calendarEmpty.hidden = visibleMonths > 0 && (!query || visibleEntries > 0);
-                return;
-            }
-
-            let visible = 0;
-            employeeRows.forEach(row => {
-                const matchesSearch = !query || normalizeSearch(row.dataset.search || '').includes(query);
-                const matchesVacation = !onlyWithVacation || row.dataset.hasVacation === '1';
-                row.hidden = !(matchesSearch && matchesVacation);
-                if (!row.hidden) visible++;
+            vacationEntries.forEach(entry => {
+                const matches = !query || normalizeSearch(entry.dataset.search || '').includes(query);
+                entry.hidden = !matches;
+                entry.classList.toggle('is-muted', false);
+                if (matches) visibleEntries++;
             });
-            if (calendarEmpty) calendarEmpty.hidden = visible > 0;
+
+            yearMonthRows.forEach(row => {
+                const matchingEntries = Array.from(row.querySelectorAll('[data-vacation-entry]')).filter(entry => !entry.hidden).length;
+                const hideBecauseSearch = Boolean(query) && matchingEntries === 0;
+                const hideBecauseEmpty = onlyWithVacation && matchingEntries === 0;
+                row.hidden = hideBecauseSearch || hideBecauseEmpty;
+                if (!row.hidden) visibleMonths++;
+            });
+
+            employeeLegendItems.forEach(item => {
+                const matchesSearch = !query || normalizeSearch(item.dataset.search || '').includes(query);
+                const matchesVacation = !onlyWithVacation || item.dataset.hasVacation === '1';
+                item.hidden = !(matchesSearch && matchesVacation);
+                item.classList.toggle('is-active', Boolean(query) && normalizeSearch(item.dataset.employeeFilter || '') === query);
+            });
+
+            if (calendarEmpty) calendarEmpty.hidden = visibleMonths > 0 && (!query || visibleEntries > 0);
         };
 
         employeeFilterButtons.forEach(button => {

@@ -155,3 +155,10 @@ Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.
 - Wochenenden, Feiertage und der aktuelle Tag bleiben klar markiert.
 - Der Jahresplan nutzt die vollständige verfügbare Bildschirmbreite und scrollt nur auf kleineren Bildschirmen horizontal.
 
+## 05.08.2026 – Urlaubskalender nur noch als Jahresübersicht
+
+- Der Umschalter zwischen Monats- und Jahresansicht wurde entfernt.
+- Der Urlaubsplan rendert unabhängig von alten URL-Parametern ausschließlich die vollständige Jahresübersicht.
+- Monatsbezeichnungen sind nicht mehr anklickbar; die frühere Monatsdetailansicht wurde aus der Oberfläche entfernt.
+- Jahresnavigation, Suche, Mitarbeiterfarben, Antragsverwaltung und Urlaubsbearbeitung bleiben erhalten.
+
