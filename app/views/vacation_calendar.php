@@ -260,7 +260,7 @@ foreach ($monthNames as $monthNumber => $monthName) {
             <span><i class="legend-swatch legend-weekend"></i> Wochenende</span>
             <span><i class="legend-swatch legend-holiday"></i> Feiertag</span>
             <?php if ($isAdmin): ?>
-                <span><i class="legend-swatch legend-select"></i> Freie Tage anklicken oder zum Markieren ziehen</span>
+                <span><i class="legend-swatch legend-select"></i> Freie Fläche oder Datum oben anklicken und zum Markieren ziehen</span>
                 <span><i class="legend-swatch legend-edit"></i> Urlaub anklicken zum Bearbeiten</span>
             <?php endif; ?>
             <span class="year-view-hint">Mitarbeiterfarbe anklicken, um gezielt zu filtern.</span>
@@ -322,7 +322,10 @@ foreach ($monthNames as $monthNumber => $monthName) {
                         </div>
 
                         <div class="vacation-year-board-grid" style="--track-count: <?= (int)$matrixMonth['track_count'] ?>">
-                            <div class="vacation-year-board-days" aria-hidden="true">
+                            <div
+                                class="vacation-year-board-days<?= $isAdmin ? ' is-admin-selectable' : '' ?>"
+                                <?= $isAdmin ? 'aria-label="Tage des Monats – anklicken oder zum Markieren ziehen"' : 'aria-hidden="true"' ?>
+                            >
                                 <?php foreach ($matrixMonth['days'] as $dayInfo): ?>
                                     <?php if ($dayInfo['outside']): ?>
                                         <span class="is-outside"></span>
@@ -332,8 +335,25 @@ foreach ($monthNames as $monthNumber => $monthName) {
                                         if ($dayInfo['weekday'] >= 6) $classes[] = 'is-weekend';
                                         if ($dayInfo['holiday'] !== '') $classes[] = 'is-holiday';
                                         if ($dayInfo['today']) $classes[] = 'is-today';
+                                        $isSelectableWorkday = $dayInfo['weekday'] < 6 && $dayInfo['holiday'] === '';
+                                        $selectionTitle = $dayInfo['holiday'] !== ''
+                                            ? (string)$dayInfo['holiday'] . ' – wird nicht als Urlaubstag gezählt'
+                                            : ($dayInfo['weekday'] >= 6
+                                                ? 'Wochenende – wird nicht als Urlaubstag gezählt'
+                                                : date('d.m.Y', strtotime((string)$dayInfo['date'])) . ' für Urlaub auswählen');
                                         ?>
-                                        <span class="<?= h(implode(' ', $classes)) ?>" title="<?= h((string)$dayInfo['holiday']) ?>">
+                                        <span
+                                            class="<?= h(implode(' ', $classes)) ?>"
+                                            title="<?= h($isAdmin ? $selectionTitle : (string)$dayInfo['holiday']) ?>"
+                                            <?php if ($isAdmin): ?>
+                                                role="button"
+                                                tabindex="<?= $isSelectableWorkday ? '0' : '-1' ?>"
+                                                data-vacation-select-handle-date="<?= h((string)$dayInfo['date']) ?>"
+                                                data-selectable-workday="<?= $isSelectableWorkday ? '1' : '0' ?>"
+                                                aria-label="<?= h($selectionTitle) ?>"
+                                                aria-disabled="<?= $isSelectableWorkday ? 'false' : 'true' ?>"
+                                            <?php endif; ?>
+                                        >
                                             <small><?= h($weekdayNames[$dayInfo['weekday']]) ?></small>
                                             <strong><?= (int)$dayInfo['day'] ?></strong>
                                         </span>

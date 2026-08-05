@@ -786,9 +786,27 @@
         const createModalElement = document.getElementById('vacationCreateModal');
         const selectionSummary = document.getElementById('vacationCalendarSelectionSummary');
         const selectionSummaryText = document.getElementById('vacationCalendarSelectionText');
-        const selectionCells = Array.from(vacationCalendarRoot.querySelectorAll('[data-vacation-select-date]'));
+        const selectionCells = Array.from(vacationCalendarRoot.querySelectorAll('[data-vacation-selection-layer] [data-vacation-select-date]'));
+        const selectionHandles = Array.from(vacationCalendarRoot.querySelectorAll('[data-vacation-select-handle-date]'));
+        const selectionCellByDate = new Map(selectionCells.map(cell => [cell.dataset.vacationSelectDate || '', cell]));
         let activeCalendarSelection = null;
         let selectedCalendarRange = null;
+        let headerHoverCell = null;
+
+        const clearHeaderHover = () => {
+            headerHoverCell?.classList.remove('is-header-hovered');
+            headerHoverCell = null;
+        };
+
+        const setHeaderHoverDate = date => {
+            const nextCell = selectionCellByDate.get(date || '') || null;
+            const selectableCell = nextCell?.dataset.selectableWorkday === '1' ? nextCell : null;
+            if (selectableCell === headerHoverCell) return;
+            clearHeaderHover();
+            if (!selectableCell || activeCalendarSelection) return;
+            selectableCell.classList.add('is-header-hovered');
+            headerHoverCell = selectableCell;
+        };
 
         const formatCalendarDate = value => {
             const parts = String(value || '').split('-').map(Number);
@@ -818,17 +836,42 @@
             };
         };
 
+        const selectionDateForElement = element => {
+            const cell = element?.closest?.('[data-vacation-select-date]');
+            if (cell && vacationCalendarRoot.contains(cell)) {
+                return {
+                    date: cell.dataset.vacationSelectDate || '',
+                    selectable: cell.dataset.selectableWorkday === '1',
+                    captureElement: cell
+                };
+            }
+
+            const handle = element?.closest?.('[data-vacation-select-handle-date]');
+            if (handle && vacationCalendarRoot.contains(handle)) {
+                return {
+                    date: handle.dataset.vacationSelectHandleDate || '',
+                    selectable: handle.dataset.selectableWorkday === '1',
+                    captureElement: handle
+                };
+            }
+
+            return null;
+        };
+
+        const applyCalendarSelectionClasses = (element, date, bounds, anchorDate) => {
+            const inRawRange = Boolean(bounds && date >= bounds.rawStart && date <= bounds.rawEnd);
+            const isWorkday = element.dataset.selectableWorkday === '1';
+            element.classList.toggle('is-range-selected', Boolean(inRawRange && isWorkday));
+            element.classList.toggle('is-range-gap', Boolean(inRawRange && !isWorkday));
+            element.classList.toggle('is-range-start', Boolean(bounds && date === bounds.start));
+            element.classList.toggle('is-range-end', Boolean(bounds && date === bounds.end));
+            element.classList.toggle('is-range-anchor', Boolean(inRawRange && date === anchorDate));
+        };
+
         const renderCalendarSelection = (firstDate, secondDate, anchorDate = '') => {
             const bounds = selectionBounds(firstDate, secondDate);
             selectionCells.forEach(cell => {
-                const date = cell.dataset.vacationSelectDate || '';
-                const inRawRange = bounds && date >= bounds.rawStart && date <= bounds.rawEnd;
-                const isWorkday = cell.dataset.selectableWorkday === '1';
-                cell.classList.toggle('is-range-selected', Boolean(inRawRange && isWorkday));
-                cell.classList.toggle('is-range-gap', Boolean(inRawRange && !isWorkday));
-                cell.classList.toggle('is-range-start', Boolean(bounds && date === bounds.start));
-                cell.classList.toggle('is-range-end', Boolean(bounds && date === bounds.end));
-                cell.classList.toggle('is-range-anchor', Boolean(inRawRange && date === anchorDate));
+                applyCalendarSelectionClasses(cell, cell.dataset.vacationSelectDate || '', bounds, anchorDate);
             });
             return bounds;
         };
@@ -837,14 +880,18 @@
             selectionCells.forEach(cell => {
                 cell.classList.remove('is-range-selected', 'is-range-gap', 'is-range-start', 'is-range-end', 'is-range-anchor');
             });
+            selectionHandles.forEach(handle => {
+                handle.classList.remove('is-range-selected', 'is-range-gap', 'is-range-start', 'is-range-end', 'is-range-anchor');
+            });
+            clearHeaderHover();
             document.body.classList.remove('vacation-range-selecting');
             activeCalendarSelection = null;
         };
 
         const resolveSelectionCellAtPoint = (clientX, clientY) => {
             const element = document.elementFromPoint(clientX, clientY);
-            const directCell = element?.closest?.('[data-vacation-select-date]');
-            if (directCell && vacationCalendarRoot.contains(directCell)) return directCell;
+            const directTarget = selectionDateForElement(element);
+            if (directTarget?.date) return selectionCellByDate.get(directTarget.date) || null;
 
             const grid = element?.closest?.('.vacation-year-board-grid');
             if (!grid || !vacationCalendarRoot.contains(grid)) return null;
@@ -875,25 +922,61 @@
         };
 
         if (createForm && createModalElement && selectionCells.length) {
+            vacationCalendarRoot.addEventListener('pointermove', event => {
+                if (activeCalendarSelection) return;
+                const handle = event.target.closest?.('[data-vacation-select-handle-date]');
+                if (!handle || !vacationCalendarRoot.contains(handle)) {
+                    clearHeaderHover();
+                    return;
+                }
+                setHeaderHoverDate(handle.dataset.vacationSelectHandleDate || '');
+            });
+
+            vacationCalendarRoot.addEventListener('pointerleave', clearHeaderHover);
+
+            vacationCalendarRoot.addEventListener('focusin', event => {
+                const handle = event.target.closest?.('[data-vacation-select-handle-date]');
+                if (!handle || !vacationCalendarRoot.contains(handle)) return;
+                setHeaderHoverDate(handle.dataset.vacationSelectHandleDate || '');
+            });
+
+            vacationCalendarRoot.addEventListener('focusout', event => {
+                const nextHandle = event.relatedTarget?.closest?.('[data-vacation-select-handle-date]');
+                if (nextHandle && vacationCalendarRoot.contains(nextHandle)) {
+                    setHeaderHoverDate(nextHandle.dataset.vacationSelectHandleDate || '');
+                    return;
+                }
+                clearHeaderHover();
+            });
+
             vacationCalendarRoot.addEventListener('pointerdown', event => {
-                const cell = event.target.closest('[data-vacation-select-date]');
-                if (!cell || cell.dataset.selectableWorkday !== '1' || event.button !== 0) return;
+                const target = selectionDateForElement(event.target);
+                if (!target || !target.selectable || !target.date || event.button !== 0) return;
 
                 event.preventDefault();
-                const date = cell.dataset.vacationSelectDate || '';
+                clearHeaderHover();
                 activeCalendarSelection = {
                     pointerId: event.pointerId,
-                    startDate: date,
-                    currentDate: date
+                    startDate: target.date,
+                    currentDate: target.date
                 };
                 selectedCalendarRange = null;
                 document.body.classList.add('vacation-range-selecting');
-                renderCalendarSelection(date, date, date);
+                renderCalendarSelection(target.date, target.date, target.date);
                 try {
-                    cell.setPointerCapture(event.pointerId);
+                    target.captureElement.setPointerCapture(event.pointerId);
                 } catch (_) {
                     // Pointer capture is optional; document listeners still keep the drag active.
                 }
+            });
+
+            vacationCalendarRoot.addEventListener('keydown', event => {
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                const target = selectionDateForElement(event.target);
+                if (!target || !target.selectable || !target.date) return;
+                event.preventDefault();
+                const bounds = renderCalendarSelection(target.date, target.date, '');
+                if (bounds) openCreateModalForSelection(bounds);
             });
 
             document.addEventListener('pointermove', event => {

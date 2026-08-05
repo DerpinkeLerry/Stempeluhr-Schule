@@ -3419,6 +3419,21 @@ textarea {
     font-size: .64rem;
 }
 
+.vacation-year-board-days.is-admin-selectable > span[data-vacation-select-handle-date] {
+    position: relative;
+    cursor: crosshair;
+    touch-action: pan-y;
+    user-select: none;
+}
+
+.vacation-year-board-days.is-admin-selectable > span[data-vacation-select-handle-date][data-selectable-workday="0"] {
+    cursor: default;
+}
+
+.vacation-year-board-days.is-admin-selectable > span[data-vacation-select-handle-date][data-selectable-workday="1"]:focus-visible {
+    outline: 0;
+}
+
 .vacation-year-board-days .is-weekend,
 .vacation-year-board-background .is-weekend {
     background: #f1f4f7;
@@ -3504,7 +3519,8 @@ textarea {
     cursor: default;
 }
 
-.vacation-year-board-day-select[data-selectable-workday="1"]:hover {
+.vacation-year-board-day-select[data-selectable-workday="1"]:hover,
+.vacation-year-board-day-select.is-header-hovered {
     z-index: 2;
     background: color-mix(in srgb, var(--wepro-orange) 12%, transparent);
     box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--wepro-orange-strong) 48%, transparent);
@@ -3559,6 +3575,7 @@ body.vacation-range-selecting {
 }
 
 body.vacation-range-selecting .vacation-year-board-day-select,
+body.vacation-range-selecting .vacation-year-board-days [data-vacation-select-handle-date],
 body.vacation-range-selecting .vacation-year-board-lanes {
     cursor: ew-resize;
 }

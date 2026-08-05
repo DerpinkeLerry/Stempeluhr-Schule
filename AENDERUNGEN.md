@@ -188,3 +188,20 @@ Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.
 - Wochenenden und Feiertage werden in der Auswahl sichtbar übersprungen und weder als Start-/Endtag noch als Urlaubstag übernommen.
 - Der Eintragsdialog zeigt den ausgewählten Zeitraum und die Anzahl der enthaltenen Arbeitstage kompakt an.
 - Bestehende Urlaubsbalken bleiben direkt anklickbar und öffnen weiterhin die Bearbeitung, ohne versehentlich eine neue Auswahl zu starten.
+
+## 05.08.2026 – Tageskopf ebenfalls für die Urlaubsauswahl nutzbar
+
+- Administratoren können die Auswahl nun nicht nur in der freien Kalenderfläche, sondern auch direkt über Wochentag und Tagesnummer beginnen.
+- Beim Ziehen über den Tageskopf wird der markierte Zeitraum genauso erweitert wie in den großen Tagesfeldern.
+- Die Markierung wird gleichzeitig im Tageskopf und in der Kalenderfläche angezeigt, damit der ausgewählte Zeitraum eindeutig erkennbar bleibt.
+- Bereits eingetragene Urlaubsbalken blockieren die Auswahl nicht mehr: Der immer freie Tageskopf dient als zuverlässige Auswahlfläche.
+- Wochenenden und Feiertage bleiben auch im Tageskopf nicht auswählbar und werden beim Ziehen weiterhin automatisch übersprungen.
+- Die Tagesfelder sind zusätzlich per Tastatur mit Eingabe- oder Leertaste für einen einzelnen Urlaubstag nutzbar.
+
+## 05.08.2026 – Tageskopf steuert nur noch das darunterliegende Auswahlfeld
+
+- Wochentag und Tagesnummer bleiben als zusätzliche Eingabefläche für Klick- und Ziehauswahl nutzbar.
+- Beim Darüberfahren über das Datum wird ausschließlich das große Kalenderfeld darunter hervorgehoben.
+- Der Tageskopf selbst erhält weder Hover-Hintergrund noch Auswahlrahmen und bleibt dadurch optisch ruhig.
+- Auch während einer Bereichsauswahl wird die Markierung nur in der eigentlichen Kalenderfläche dargestellt.
+- Tastaturauswahl über Eingabe- oder Leertaste markiert ebenfalls nur das darunterliegende Tagesfeld.
