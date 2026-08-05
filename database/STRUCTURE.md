@@ -1,6 +1,6 @@
-# Datenstruktur – Schema Version 2
+# Datenstruktur – Schema Version 3
 
-Die Anwendung verwendet SQLite. Die Schema-Version steht in `PRAGMA user_version` und ist aktuell `2`.
+Die Anwendung verwendet SQLite. Die Schema-Version steht in `PRAGMA user_version` und ist aktuell `3`.
 Beim ersten Start mit einer älteren Projektdatenbank führt `app/db.php` die strukturelle Migration automatisch aus. Vor einem produktiven Update muss trotzdem eine Dateikopie von `data/stempeluhr.sqlite` erstellt werden.
 
 ## Zentrale Tabellen
@@ -41,6 +41,8 @@ Urlaubskonto eines Mitarbeiters pro Kalenderjahr.
 
 Der genommene Urlaub wird nicht redundant gespeichert, sondern aus `absence` berechnet. Halbe Urlaubstage zählen als `0,5` Tage. Gesetzliche Feiertage und arbeitsfreie Wochentage werden nicht abgezogen.
 
+Ungenutzter regulärer Anspruch wird automatisch in das unmittelbar folgende Kalenderjahr übertragen. Dieser Übertrag steht nur für Urlaubstage bis einschließlich 31. März zur Verfügung. Danach wird ein nicht genutzter Rest als verfallen ausgewiesen und kann nicht für spätere Urlaubstage verwendet werden. Übertrag aus einem noch älteren Jahr wird nicht erneut übertragen.
+
 ### `work_session`
 Tatsächliche Arbeitszeiträume.
 
@@ -64,6 +66,18 @@ Urlaub, Krankheit, Schule und sonstige Abwesenheiten.
 - `legacy_worktime_id`: Referenz auf den alten Tagesdatensatz
 
 `AM` und `PM` sind nur bei Urlaub und nur für ein einzelnes Datum erlaubt.
+
+### `vacation_request`
+Dauerhaftes Archiv aller durch Mitarbeiter eingereichten Urlaubsanträge.
+
+- `start_date`, `end_date`, `portion`: beantragter Urlaubszeitraum
+- `note`: Hinweis des Mitarbeiters
+- `status`: `PENDING`, `APPROVED`, `REJECTED` oder `CANCELLED`
+- `requested_at`: Zeitpunkt der Antragstellung
+- `decided_at`, `decided_by`, `decision_note`: Entscheidung und Nachvollziehbarkeit
+- `absence_id`: optionale Verknüpfung zum erzeugten Urlaubseintrag
+
+Bei einer Genehmigung wird ein Datensatz in `absence` angelegt. Wird dieser Urlaubseintrag später gelöscht, setzt SQLite nur `absence_id` auf `NULL`; der Antrag selbst bleibt im Archiv erhalten. Mitarbeiter werden in der Anwendung ausschließlich deaktiviert und nicht physisch gelöscht, damit auch deren Antragshistorie aufrufbar bleibt.
 
 ### `public_holiday`
 Gesetzliche Feiertage pro Region. Die vorhandene Region ist `DE-BY-KF`.

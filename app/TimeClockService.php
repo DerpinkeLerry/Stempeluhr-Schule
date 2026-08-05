@@ -29,6 +29,116 @@ final class TimeClockService
         return $st->fetchAll();
     }
 
+    public function listActiveEmployeesForVacationCalendar(): array
+    {
+        return $this->pdo->query(
+            "SELECT id, name, email, department, personnel_number, timezone, holiday_region
+             FROM employee
+             WHERE active=1
+             ORDER BY name COLLATE NOCASE, id"
+        )->fetchAll();
+    }
+
+    public function listVacationAbsencesForPeriod(string $startDate, string $endDate): array
+    {
+        if (!$this->validDate($startDate) || !$this->validDate($endDate) || $endDate < $startDate) {
+            throw new RuntimeException('Der Kalenderzeitraum ist ungültig');
+        }
+
+        $st = $this->pdo->prepare(
+            "SELECT a.*, e.name AS employee_name, e.department, e.personnel_number
+             FROM absence a
+             JOIN employee e ON e.id=a.employee_id
+             WHERE e.active=1 AND a.type='VACATION' AND a.start_date<=? AND a.end_date>=?
+             ORDER BY e.name COLLATE NOCASE, a.start_date, a.id"
+        );
+        $st->execute([$endDate, $startDate]);
+        return $st->fetchAll();
+    }
+
+    public function countPendingVacationRequests(): int
+    {
+        return (int)$this->pdo->query("SELECT COUNT(*) FROM vacation_request WHERE status='PENDING'")->fetchColumn();
+    }
+
+    public function countVacationRequestsForAdmin(string $status = 'ALL'): int
+    {
+        $status = strtoupper(trim($status));
+        if ($status !== 'ALL' && !in_array($status, ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'], true)) {
+            $status = 'PENDING';
+        }
+        if ($status === 'ALL') {
+            return (int)$this->pdo->query('SELECT COUNT(*) FROM vacation_request')->fetchColumn();
+        }
+        $st = $this->pdo->prepare('SELECT COUNT(*) FROM vacation_request WHERE status=?');
+        $st->execute([$status]);
+        return (int)$st->fetchColumn();
+    }
+
+    public function listVacationRequestsForAdmin(string $status = 'PENDING', int $limit = 50, int $offset = 0): array
+    {
+        $status = strtoupper(trim($status));
+        if ($status !== 'ALL' && !in_array($status, ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'], true)) {
+            $status = 'PENDING';
+        }
+        $limit = max(1, min(200, $limit));
+        $offset = max(0, $offset);
+        $where = $status === 'ALL' ? '' : 'WHERE vr.status=:status';
+        $sql = "SELECT vr.*, e.name AS employee_name, e.department, e.personnel_number,
+                       d.name AS decided_by_name
+                FROM vacation_request vr
+                JOIN employee e ON e.id=vr.employee_id
+                LEFT JOIN employee d ON d.id=vr.decided_by
+                $where
+                ORDER BY CASE vr.status WHEN 'PENDING' THEN 0 ELSE 1 END,
+                         vr.requested_at DESC, vr.id DESC
+                LIMIT :limit OFFSET :offset";
+        $st = $this->pdo->prepare($sql);
+        if ($status !== 'ALL') {
+            $st->bindValue(':status', $status, PDO::PARAM_STR);
+        }
+        $st->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $st->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $st->execute();
+        $requests = $st->fetchAll();
+        foreach ($requests as &$request) {
+            $request['requested_days'] = $this->calculateVacationDaysForRange(
+                (int)$request['employee_id'],
+                (string)$request['start_date'],
+                (string)$request['end_date'],
+                (string)$request['portion']
+            );
+        }
+        unset($request);
+        return $requests;
+    }
+
+    public function listVacationRequestsForEmployee(int $employeeId): array
+    {
+        if (!$this->getEmployee($employeeId)) {
+            throw new RuntimeException('Mitarbeiter nicht gefunden');
+        }
+        $st = $this->pdo->prepare(
+            "SELECT vr.*, d.name AS decided_by_name
+             FROM vacation_request vr
+             LEFT JOIN employee d ON d.id=vr.decided_by
+             WHERE vr.employee_id=?
+             ORDER BY vr.requested_at DESC, vr.id DESC"
+        );
+        $st->execute([$employeeId]);
+        $requests = $st->fetchAll();
+        foreach ($requests as &$request) {
+            $request['requested_days'] = $this->calculateVacationDaysForRange(
+                $employeeId,
+                (string)$request['start_date'],
+                (string)$request['end_date'],
+                (string)$request['portion']
+            );
+        }
+        unset($request);
+        return $requests;
+    }
+
     public function getEmployee(int $id): ?array
     {
         $st = $this->pdo->prepare('SELECT * FROM employee WHERE id=?');
@@ -777,7 +887,7 @@ final class TimeClockService
         }
     }
 
-    public function getVacationAccount(int $employeeId, int $year): array
+    public function getVacationAccount(int $employeeId, int $year, ?string $asOfDate = null): array
     {
         if ($year < 1970 || $year > 2200) {
             throw new RuntimeException('Das Urlaubsjahr ist ungültig');
@@ -787,22 +897,34 @@ final class TimeClockService
             throw new RuntimeException('Mitarbeiter nicht gefunden');
         }
 
-        $st = $this->pdo->prepare('SELECT * FROM vacation_account WHERE employee_id=? AND year=?');
-        $st->execute([$employeeId, $year]);
-        $account = $st->fetch() ?: [
-            'employee_id' => $employeeId,
-            'year' => $year,
-            'entitlement_days' => 0.0,
-            'carryover_days' => 0.0,
-            'adjustment_days' => 0.0,
-            'note' => '',
-            'source' => 'system',
-        ];
-        $used = $this->calculateVacationUsedDays($employeeId, $year, (string)$employee['holiday_region']);
-        $total = (float)$account['entitlement_days'] + (float)$account['carryover_days'] + (float)$account['adjustment_days'];
-        $account['used_days'] = $used;
-        $account['total_days'] = $total;
-        $account['remaining_days'] = $total - $used;
+        $account = $this->ensureVacationAccountRecord($employeeId, $year, $employee);
+        $usage = $this->calculateVacationUsageBreakdown($employeeId, $year, (string)$employee['holiday_region']);
+        $state = $this->vacationCapacityState(
+            (float)$account['entitlement_days'],
+            (float)$account['carryover_days'],
+            (float)$account['adjustment_days'],
+            (float)$usage['early_days'],
+            (float)$usage['late_days']
+        );
+
+        $asOfDate = $asOfDate !== null && $this->validDate($asOfDate)
+            ? $asOfDate
+            : $this->now()->setTimezone(new DateTimeZone((string)$employee['timezone']))->format('Y-m-d');
+        $carryoverExpiry = sprintf('%04d-03-31', $year);
+        $carryoverAvailable = $asOfDate <= $carryoverExpiry;
+
+        $account['used_days'] = $usage['total_days'];
+        $account['used_until_march_days'] = $usage['early_days'];
+        $account['used_after_march_days'] = $usage['late_days'];
+        $account['carryover_used_days'] = $state['carryover_used_days'];
+        $account['carryover_remaining_days'] = $state['carryover_remaining_days'];
+        $account['expired_carryover_days'] = $carryoverAvailable ? 0.0 : $state['carryover_remaining_days'];
+        $account['entitlement_remaining_days'] = $state['entitlement_remaining_days'];
+        $account['total_days'] = $state['total_days'];
+        $account['remaining_days'] = $state['entitlement_remaining_days']
+            + ($carryoverAvailable ? $state['carryover_remaining_days'] : 0.0);
+        $account['carryover_expiry'] = $carryoverExpiry;
+        $account['carryover_available'] = $carryoverAvailable;
         return $account;
     }
 
@@ -814,7 +936,8 @@ final class TimeClockService
         float $adjustmentDays,
         string $note = ''
     ): void {
-        if (!$this->getEmployee($employeeId)) {
+        $employee = $this->getEmployee($employeeId);
+        if (!$employee) {
             throw new RuntimeException('Mitarbeiter nicht gefunden');
         }
         if ($year < 1970 || $year > 2200) {
@@ -823,6 +946,21 @@ final class TimeClockService
         if ($entitlementDays < 0 || $entitlementDays > 365 || abs($carryoverDays) > 365 || abs($adjustmentDays) > 365) {
             throw new RuntimeException('Die Urlaubswerte sind ungültig');
         }
+
+        $current = $this->ensureVacationAccountRecord($employeeId, $year, $employee);
+        if (!empty($current['carryover_automatic'])) {
+            $carryoverDays = (float)$current['carryover_days'];
+        }
+        $usage = $this->calculateVacationUsageBreakdown($employeeId, $year, (string)$employee['holiday_region']);
+        $this->assertVacationUsageFitsAccount(
+            $year,
+            $entitlementDays,
+            $carryoverDays,
+            $adjustmentDays,
+            (float)$usage['early_days'],
+            (float)$usage['late_days']
+        );
+
         $this->upsertVacationAccountInternal(
             $employeeId,
             $year,
@@ -840,19 +978,23 @@ final class TimeClockService
         string $startDate,
         string $endDate,
         string $note = '',
-        string $portion = 'FULL'
+        string $portion = 'FULL',
+        string $source = 'web'
     ): int {
         $this->validateAbsenceInput($employeeId, $type, $portion, $startDate, $endDate);
-
-        $check = $this->pdo->prepare('SELECT COUNT(*) FROM absence WHERE employee_id=? AND start_date<=? AND end_date>=?');
-        $check->execute([$employeeId, $endDate, $startDate]);
-        if ((int)$check->fetchColumn() > 0) {
-            throw new RuntimeException('In dem Zeitraum gibt es schon eine Abwesenheit');
+        $this->assertNoAbsenceOverlap($employeeId, $startDate, $endDate);
+        if ($type === 'VACATION') {
+            if ($this->calculateVacationDaysForRange($employeeId, $startDate, $endDate, $portion) <= 0) {
+                throw new RuntimeException('Der Zeitraum enthält keinen geplanten Arbeitstag');
+            }
+            $this->assertVacationBalanceAvailable($employeeId, [
+                ['start_date' => $startDate, 'end_date' => $endDate, 'portion' => $portion],
+            ]);
         }
 
         $now = $this->nowUtc();
         $st = $this->pdo->prepare('INSERT INTO absence(employee_id, type, portion, start_date, end_date, note, source, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?)');
-        $st->execute([$employeeId, $type, $portion, $startDate, $endDate, trim($note), 'web', $now, $now]);
+        $st->execute([$employeeId, $type, $portion, $startDate, $endDate, trim($note), trim($source) ?: 'web', $now, $now]);
         return (int)$this->pdo->lastInsertId();
     }
 
@@ -875,10 +1017,14 @@ final class TimeClockService
         }
 
         $this->validateAbsenceInput($employeeId, $type, $portion, $startDate, $endDate);
-        $check = $this->pdo->prepare('SELECT COUNT(*) FROM absence WHERE employee_id=? AND id<>? AND start_date<=? AND end_date>=?');
-        $check->execute([$employeeId, $absenceId, $endDate, $startDate]);
-        if ((int)$check->fetchColumn() > 0) {
-            throw new RuntimeException('In dem Zeitraum gibt es schon eine Abwesenheit');
+        $this->assertNoAbsenceOverlap($employeeId, $startDate, $endDate, $absenceId);
+        if ($type === 'VACATION') {
+            if ($this->calculateVacationDaysForRange($employeeId, $startDate, $endDate, $portion) <= 0) {
+                throw new RuntimeException('Der Zeitraum enthält keinen geplanten Arbeitstag');
+            }
+            $this->assertVacationBalanceAvailable($employeeId, [
+                ['start_date' => $startDate, 'end_date' => $endDate, 'portion' => $portion],
+            ], $absenceId);
         }
 
         $st = $this->pdo->prepare('UPDATE absence SET type=?, portion=?, start_date=?, end_date=?, note=?, updated_at=? WHERE id=?');
@@ -894,6 +1040,129 @@ final class TimeClockService
         $st->execute([$absenceId]);
         if ($st->rowCount() !== 1) {
             throw new RuntimeException('Abwesenheit nicht gefunden');
+        }
+    }
+
+    public function createVacationRequest(
+        int $employeeId,
+        string $startDate,
+        string $endDate,
+        string $note = '',
+        string $portion = 'FULL'
+    ): int {
+        $employee = $this->getEmployee($employeeId);
+        if (!$employee || (int)$employee['active'] !== 1) {
+            throw new RuntimeException('Mitarbeiter nicht gefunden');
+        }
+        $this->validateAbsenceInput($employeeId, 'VACATION', $portion, $startDate, $endDate);
+        if ($this->calculateVacationDaysForRange($employeeId, $startDate, $endDate, $portion) <= 0) {
+            throw new RuntimeException('Der Zeitraum enthält keinen geplanten Arbeitstag');
+        }
+        $localToday = $this->now()->setTimezone(new DateTimeZone((string)$employee['timezone']))->format('Y-m-d');
+        if ($startDate < $localToday) {
+            throw new RuntimeException('Urlaub kann nur für heute oder einen zukünftigen Zeitraum beantragt werden');
+        }
+        $this->assertNoAbsenceOverlap($employeeId, $startDate, $endDate);
+
+        $overlap = $this->pdo->prepare(
+            "SELECT COUNT(*) FROM vacation_request
+             WHERE employee_id=? AND status='PENDING' AND start_date<=? AND end_date>=?"
+        );
+        $overlap->execute([$employeeId, $endDate, $startDate]);
+        if ((int)$overlap->fetchColumn() > 0) {
+            throw new RuntimeException('Für diesen Zeitraum gibt es bereits einen offenen Urlaubsantrag');
+        }
+
+        $pending = $this->pdo->prepare(
+            "SELECT start_date, end_date, portion FROM vacation_request
+             WHERE employee_id=? AND status='PENDING'"
+        );
+        $pending->execute([$employeeId]);
+        $ranges = $pending->fetchAll();
+        $ranges[] = ['start_date' => $startDate, 'end_date' => $endDate, 'portion' => $portion];
+        $this->assertVacationBalanceAvailable($employeeId, $ranges);
+
+        $now = $this->nowUtc();
+        $st = $this->pdo->prepare(
+            "INSERT INTO vacation_request(
+                employee_id, start_date, end_date, portion, note, status,
+                requested_at, created_at, updated_at
+             ) VALUES(?,?,?,?,?,'PENDING',?,?,?)"
+        );
+        $st->execute([$employeeId, $startDate, $endDate, $portion, trim($note), $now, $now, $now]);
+        return (int)$this->pdo->lastInsertId();
+    }
+
+    public function decideVacationRequest(
+        int $requestId,
+        int $adminId,
+        string $decision,
+        string $decisionNote = ''
+    ): array {
+        $decision = strtoupper(trim($decision));
+        if (!in_array($decision, ['APPROVED', 'REJECTED'], true)) {
+            throw new RuntimeException('Die Entscheidung ist ungültig');
+        }
+        $admin = $this->getEmployee($adminId);
+        if (!$admin || (int)$admin['active'] !== 1 || (string)$admin['role'] !== 'admin') {
+            throw new RuntimeException('Admin-Konto nicht gefunden');
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $st = $this->pdo->prepare(
+                "SELECT vr.*, e.name AS employee_name, e.active AS employee_active
+                 FROM vacation_request vr
+                 JOIN employee e ON e.id=vr.employee_id
+                 WHERE vr.id=?"
+            );
+            $st->execute([$requestId]);
+            $request = $st->fetch();
+            if (!$request) {
+                throw new RuntimeException('Urlaubsantrag nicht gefunden');
+            }
+            if ((string)$request['status'] !== 'PENDING') {
+                throw new RuntimeException('Dieser Urlaubsantrag wurde bereits bearbeitet');
+            }
+
+            $absenceId = null;
+            if ($decision === 'APPROVED') {
+                if ((int)$request['employee_active'] !== 1) {
+                    throw new RuntimeException('Der Mitarbeiter ist nicht mehr aktiv; der Antrag kann nur noch abgelehnt werden');
+                }
+                $absenceId = $this->createAbsence(
+                    (int)$request['employee_id'],
+                    'VACATION',
+                    (string)$request['start_date'],
+                    (string)$request['end_date'],
+                    (string)$request['note'],
+                    (string)$request['portion'],
+                    'vacation_request'
+                );
+            }
+
+            $now = $this->nowUtc();
+            $update = $this->pdo->prepare(
+                'UPDATE vacation_request
+                 SET status=?, decided_at=?, decided_by=?, decision_note=?, absence_id=?, updated_at=?
+                 WHERE id=? AND status=\'PENDING\''
+            );
+            $update->execute([$decision, $now, $adminId, trim($decisionNote), $absenceId, $now, $requestId]);
+            if ($update->rowCount() !== 1) {
+                throw new RuntimeException('Der Urlaubsantrag konnte nicht mehr bearbeitet werden');
+            }
+            $this->pdo->commit();
+
+            return [
+                'status' => $decision,
+                'absence_id' => $absenceId,
+                'employee_name' => (string)$request['employee_name'],
+            ];
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
         }
     }
 
@@ -1292,14 +1561,258 @@ final class TimeClockService
         $st->execute([$employeeId, $year, $entitlementDays, $carryoverDays, $adjustmentDays, $note, $source, $now, $now]);
     }
 
-    private function calculateVacationUsedDays(int $employeeId, int $year, string $region): float
+    private function ensureVacationAccountRecord(int $employeeId, int $year, array $employee): array
     {
+        $st = $this->pdo->prepare('SELECT * FROM vacation_account WHERE employee_id=? AND year=?');
+        $st->execute([$employeeId, $year]);
+        $account = $st->fetch() ?: null;
+
+        $previous = null;
+        if ($year > 1970) {
+            $previousSt = $this->pdo->prepare('SELECT 1 FROM vacation_account WHERE employee_id=? AND year=?');
+            $previousSt->execute([$employeeId, $year - 1]);
+            $hasImmediatePrevious = (bool)$previousSt->fetchColumn();
+
+            if (!$hasImmediatePrevious) {
+                $olderSt = $this->pdo->prepare('SELECT MAX(year) FROM vacation_account WHERE employee_id=? AND year<?');
+                $olderSt->execute([$employeeId, $year]);
+                $latestOlderYear = (int)($olderSt->fetchColumn() ?: 0);
+                if ($latestOlderYear > 0) {
+                    // Fill skipped years one by one so entitlement and carryover
+                    // continue consistently even when an admin jumps ahead.
+                    $this->ensureVacationAccountRecord($employeeId, $year - 1, $employee);
+                    $hasImmediatePrevious = true;
+                }
+            }
+
+            if ($hasImmediatePrevious) {
+                $previous = $this->ensureVacationAccountRecord($employeeId, $year - 1, $employee);
+            }
+        }
+
+        $automaticCarryover = null;
+        if ($previous !== null) {
+            $previousUsage = $this->calculateVacationUsageBreakdown(
+                $employeeId,
+                $year - 1,
+                (string)$employee['holiday_region']
+            );
+            $previousState = $this->vacationCapacityState(
+                (float)$previous['entitlement_days'],
+                (float)$previous['carryover_days'],
+                (float)$previous['adjustment_days'],
+                (float)$previousUsage['early_days'],
+                (float)$previousUsage['late_days']
+            );
+            // At the end of a year any older carryover has already expired.
+            // Only the unused entitlement of the immediately previous year is transferred.
+            $automaticCarryover = max(0.0, (float)$previousState['entitlement_remaining_days']);
+        }
+
+        if ($account === null) {
+            $entitlement = $previous !== null ? (float)$previous['entitlement_days'] : 0.0;
+            $carryover = $automaticCarryover ?? 0.0;
+            $this->upsertVacationAccountInternal(
+                $employeeId,
+                $year,
+                $entitlement,
+                $carryover,
+                0.0,
+                '',
+                'system'
+            );
+            $st->execute([$employeeId, $year]);
+            $account = $st->fetch();
+        } elseif ($automaticCarryover !== null && abs((float)$account['carryover_days'] - $automaticCarryover) > 0.0001) {
+            $update = $this->pdo->prepare('UPDATE vacation_account SET carryover_days=?, updated_at=? WHERE id=?');
+            $update->execute([$automaticCarryover, $this->nowUtc(), (int)$account['id']]);
+            $account['carryover_days'] = $automaticCarryover;
+        }
+
+        $account['carryover_automatic'] = $automaticCarryover !== null;
+        return $account;
+    }
+
+    private function assertNoAbsenceOverlap(int $employeeId, string $startDate, string $endDate, int $excludeAbsenceId = 0): void
+    {
+        $sql = 'SELECT COUNT(*) FROM absence WHERE employee_id=? AND start_date<=? AND end_date>=?';
+        $params = [$employeeId, $endDate, $startDate];
+        if ($excludeAbsenceId > 0) {
+            $sql .= ' AND id<>?';
+            $params[] = $excludeAbsenceId;
+        }
+        $check = $this->pdo->prepare($sql);
+        $check->execute($params);
+        if ((int)$check->fetchColumn() > 0) {
+            throw new RuntimeException('In dem Zeitraum gibt es schon eine Abwesenheit');
+        }
+    }
+
+    private function calculateVacationDaysForRange(int $employeeId, string $startDate, string $endDate, string $portion): float
+    {
+        $employee = $this->getEmployee($employeeId);
+        if (!$employee || !$this->validDate($startDate) || !$this->validDate($endDate) || $endDate < $startDate) {
+            return 0.0;
+        }
+        $byYear = $this->vacationUsageForRangeByYear(
+            $employeeId,
+            (string)$employee['holiday_region'],
+            $startDate,
+            $endDate,
+            $portion
+        );
+        return array_sum(array_map(static fn(array $usage): float => (float)$usage['total_days'], $byYear));
+    }
+
+    private function assertVacationBalanceAvailable(int $employeeId, array $ranges, int $excludeAbsenceId = 0): void
+    {
+        $employee = $this->getEmployee($employeeId);
+        if (!$employee) {
+            throw new RuntimeException('Mitarbeiter nicht gefunden');
+        }
+
+        $requestedByYear = [];
+        foreach ($ranges as $range) {
+            $startDate = (string)($range['start_date'] ?? '');
+            $endDate = (string)($range['end_date'] ?? '');
+            $portion = (string)($range['portion'] ?? 'FULL');
+            if (!$this->validDate($startDate) || !$this->validDate($endDate) || $endDate < $startDate) {
+                throw new RuntimeException('Der Urlaubszeitraum ist ungültig');
+            }
+            foreach ($this->vacationUsageForRangeByYear(
+                $employeeId,
+                (string)$employee['holiday_region'],
+                $startDate,
+                $endDate,
+                $portion
+            ) as $year => $usage) {
+                $requestedByYear[$year]['early_days'] = ($requestedByYear[$year]['early_days'] ?? 0.0) + (float)$usage['early_days'];
+                $requestedByYear[$year]['late_days'] = ($requestedByYear[$year]['late_days'] ?? 0.0) + (float)$usage['late_days'];
+            }
+        }
+
+        if ($requestedByYear === []) {
+            throw new RuntimeException('Der Zeitraum enthält keinen geplanten Arbeitstag');
+        }
+
+        foreach ($requestedByYear as $year => $requested) {
+            $year = (int)$year;
+            $account = $this->ensureVacationAccountRecord($employeeId, $year, $employee);
+            $approved = $this->calculateVacationUsageBreakdown(
+                $employeeId,
+                $year,
+                (string)$employee['holiday_region'],
+                $excludeAbsenceId
+            );
+            $this->assertVacationUsageFitsAccount(
+                $year,
+                (float)$account['entitlement_days'],
+                (float)$account['carryover_days'],
+                (float)$account['adjustment_days'],
+                (float)$approved['early_days'] + (float)$requested['early_days'],
+                (float)$approved['late_days'] + (float)$requested['late_days']
+            );
+        }
+    }
+
+    private function assertVacationUsageFitsAccount(
+        int $year,
+        float $entitlementDays,
+        float $carryoverDays,
+        float $adjustmentDays,
+        float $earlyDays,
+        float $lateDays
+    ): void {
+        $state = $this->vacationCapacityState(
+            $entitlementDays,
+            $carryoverDays,
+            $adjustmentDays,
+            $earlyDays,
+            $lateDays
+        );
+        $availableEntitlement = $entitlementDays + $adjustmentDays;
+        $availableUntilMarch = $availableEntitlement + max(0.0, $carryoverDays);
+        $epsilon = 0.0001;
+
+        if ($earlyDays > $availableUntilMarch + $epsilon || (float)$state['entitlement_used_days'] > $availableEntitlement + $epsilon) {
+            $available = max(0.0, $availableEntitlement)
+                + min(max(0.0, $carryoverDays), max(0.0, $earlyDays));
+            $used = $earlyDays + $lateDays;
+            throw new RuntimeException(sprintf(
+                'Nicht genügend Urlaub für %d: %.1f Tage geplant, %.1f Tage verfügbar. Resturlaub aus dem Vorjahr verfällt nach dem 31.03.',
+                $year,
+                $used,
+                $available
+            ));
+        }
+    }
+
+    private function vacationCapacityState(
+        float $entitlementDays,
+        float $carryoverDays,
+        float $adjustmentDays,
+        float $earlyDays,
+        float $lateDays
+    ): array {
+        $usableCarryover = max(0.0, $carryoverDays);
+        $carryoverUsed = min($usableCarryover, max(0.0, $earlyDays));
+        $entitlementUsed = max(0.0, $earlyDays - $carryoverUsed) + max(0.0, $lateDays);
+        $entitlementTotal = $entitlementDays + $adjustmentDays;
+
+        return [
+            'total_days' => $entitlementTotal + $usableCarryover,
+            'carryover_used_days' => $carryoverUsed,
+            'carryover_remaining_days' => max(0.0, $usableCarryover - $carryoverUsed),
+            'entitlement_used_days' => $entitlementUsed,
+            'entitlement_remaining_days' => $entitlementTotal - $entitlementUsed,
+        ];
+    }
+
+    private function vacationUsageForRangeByYear(
+        int $employeeId,
+        string $region,
+        string $startDate,
+        string $endDate,
+        string $portion
+    ): array {
+        $current = new DateTimeImmutable($startDate . ' 00:00:00', new DateTimeZone('UTC'));
+        $last = new DateTimeImmutable($endDate . ' 00:00:00', new DateTimeZone('UTC'));
+        $byYear = [];
+        while ($current <= $last) {
+            $day = $current->format('Y-m-d');
+            if ($this->getScheduledMinutesForDate($employeeId, $day) > 0 && !$this->isHoliday($region, $day)) {
+                $year = (int)$current->format('Y');
+                $fraction = $portion === 'FULL' ? 1.0 : 0.5;
+                $bucket = $day <= sprintf('%04d-03-31', $year) ? 'early_days' : 'late_days';
+                $byYear[$year][$bucket] = ($byYear[$year][$bucket] ?? 0.0) + $fraction;
+                $byYear[$year]['total_days'] = ($byYear[$year]['total_days'] ?? 0.0) + $fraction;
+                $byYear[$year]['early_days'] = $byYear[$year]['early_days'] ?? 0.0;
+                $byYear[$year]['late_days'] = $byYear[$year]['late_days'] ?? 0.0;
+            }
+            $current = $current->modify('+1 day');
+        }
+        return $byYear;
+    }
+
+    private function calculateVacationUsageBreakdown(
+        int $employeeId,
+        int $year,
+        string $region,
+        int $excludeAbsenceId = 0
+    ): array {
         $yearStart = sprintf('%04d-01-01', $year);
         $yearEnd = sprintf('%04d-12-31', $year);
-        $st = $this->pdo->prepare(
-            "SELECT * FROM absence WHERE employee_id=? AND type='VACATION' AND start_date<=? AND end_date>=? ORDER BY start_date"
-        );
-        $st->execute([$employeeId, $yearEnd, $yearStart]);
+        $sql = "SELECT * FROM absence
+                WHERE employee_id=? AND type='VACATION' AND start_date<=? AND end_date>=?";
+        $params = [$employeeId, $yearEnd, $yearStart];
+        if ($excludeAbsenceId > 0) {
+            $sql .= ' AND id<>?';
+            $params[] = $excludeAbsenceId;
+        }
+        $sql .= ' ORDER BY start_date, id';
+        $st = $this->pdo->prepare($sql);
+        $st->execute($params);
+
         $fractions = [];
         foreach ($st->fetchAll() as $absence) {
             $start = max((string)$absence['start_date'], $yearStart);
@@ -1316,7 +1829,22 @@ final class TimeClockService
                 $current = $current->modify('+1 day');
             }
         }
-        return array_sum($fractions);
+
+        $early = 0.0;
+        $late = 0.0;
+        $cutoff = sprintf('%04d-03-31', $year);
+        foreach ($fractions as $day => $fraction) {
+            if ($day <= $cutoff) {
+                $early += $fraction;
+            } else {
+                $late += $fraction;
+            }
+        }
+        return [
+            'early_days' => $early,
+            'late_days' => $late,
+            'total_days' => $early + $late,
+        ];
     }
 
     private function findAbsence(int $employeeId, string $day): ?array

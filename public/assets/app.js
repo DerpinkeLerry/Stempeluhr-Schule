@@ -62,6 +62,73 @@
         return sign + secondsToTime(Math.abs(seconds));
     }
 
+    function notificationIcon(type) {
+        const icons = {
+            success: '<path d="m5 12 4 4L19 6"/>',
+            warning: '<path d="M12 8v5M12 16h.01M10.3 3.7 2.7 17a2 2 0 0 0 1.7 3h15.2a2 2 0 0 0 1.7-3L13.7 3.7a2 2 0 0 0-3.4 0Z"/>',
+            danger: '<path d="M7 7l10 10M17 7 7 17M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>',
+            info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>'
+        };
+        return `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[type] || icons.info}</svg>`;
+    }
+
+    function attachNotificationCountdown(element, duration, dismiss) {
+        const progress = element.querySelector('.notification-progress > span');
+        if (progress) {
+            progress.style.animationDuration = `${duration}ms`;
+        }
+
+        let remaining = duration;
+        let startedAt = Date.now();
+        let timer = 0;
+        let stopped = false;
+        const pauseReasons = new Set();
+
+        const finish = () => {
+            if (stopped) return;
+            stopped = true;
+            window.clearTimeout(timer);
+            dismiss();
+        };
+        const schedule = () => {
+            if (stopped || pauseReasons.size > 0) return;
+            if (remaining <= 0) {
+                finish();
+                return;
+            }
+            startedAt = Date.now();
+            timer = window.setTimeout(finish, remaining);
+            if (progress) progress.style.animationPlayState = 'running';
+        };
+        const pause = reason => {
+            if (stopped || pauseReasons.has(reason)) return;
+            if (pauseReasons.size === 0) {
+                window.clearTimeout(timer);
+                remaining = Math.max(0, remaining - (Date.now() - startedAt));
+                if (progress) progress.style.animationPlayState = 'paused';
+            }
+            pauseReasons.add(reason);
+        };
+        const resume = reason => {
+            pauseReasons.delete(reason);
+            schedule();
+        };
+        const stop = () => {
+            stopped = true;
+            window.clearTimeout(timer);
+        };
+
+        schedule();
+        element.addEventListener('mouseenter', () => pause('hover'));
+        element.addEventListener('mouseleave', () => resume('hover'));
+        element.addEventListener('focusin', () => pause('focus'));
+        element.addEventListener('focusout', event => {
+            if (!element.contains(event.relatedTarget)) resume('focus');
+        });
+        element.addEventListener('hidden.bs.toast', stop, {once: true});
+        element.addEventListener('closed.bs.alert', stop, {once: true});
+    }
+
     function showToast(message, type = 'info') {
         const container = document.getElementById('appToastContainer');
         if (!container || !window.bootstrap?.Toast) {
@@ -69,23 +136,63 @@
             return;
         }
 
-        const toast = document.createElement('div');
         const safeType = ['success', 'warning', 'danger', 'info'].includes(type) ? type : 'info';
-        toast.className = `toast toast-${safeType}`;
-        toast.setAttribute('role', 'status');
-        toast.setAttribute('aria-live', 'polite');
+        const titles = {
+            success: 'Erfolgreich gespeichert',
+            warning: 'Bitte beachten',
+            danger: 'Aktion nicht möglich',
+            info: 'Information'
+        };
+        const delays = {success: 5500, info: 6500, warning: 8000, danger: 10000};
+        const delay = delays[safeType];
+        const toast = document.createElement('div');
+        toast.className = `toast app-toast toast-${safeType}`;
+        toast.setAttribute('role', safeType === 'danger' ? 'alert' : 'status');
+        toast.setAttribute('aria-live', safeType === 'danger' ? 'assertive' : 'polite');
         toast.setAttribute('aria-atomic', 'true');
         toast.innerHTML = `
             <div class="toast-body">
-                <span class="toast-dot" aria-hidden="true"></span>
-                <span class="flex-grow-1">${escapeHtml(message)}</span>
-                <button type="button" class="btn-close ms-2" data-bs-dismiss="toast" aria-label="Schließen"></button>
+                <span class="toast-icon" aria-hidden="true">${notificationIcon(safeType)}</span>
+                <span class="toast-copy">
+                    <strong>${titles[safeType]}</strong>
+                    <span>${escapeHtml(message)}</span>
+                </span>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Schließen"></button>
             </div>
+            <span class="notification-progress" aria-hidden="true"><span></span></span>
         `;
         container.appendChild(toast);
-        const instance = new window.bootstrap.Toast(toast, {delay: type === 'warning' ? 6500 : 4200});
+        const instance = new window.bootstrap.Toast(toast, {autohide: false});
         toast.addEventListener('hidden.bs.toast', () => toast.remove(), {once: true});
         instance.show();
+        attachNotificationCountdown(toast, delay, () => instance.hide());
+    }
+
+    document.querySelectorAll('.app-flash-notification[data-notification-delay]').forEach(alertElement => {
+        const delay = Number.parseInt(alertElement.dataset.notificationDelay || '7000', 10);
+        const alertInstance = window.bootstrap?.Alert?.getOrCreateInstance(alertElement);
+        if (!alertInstance) return;
+        attachNotificationCountdown(alertElement, delay, () => alertInstance.close());
+    });
+
+    function queueToastAfterReload(message, type = 'success') {
+        try {
+            window.sessionStorage.setItem('stempeluhr.notification', JSON.stringify({message, type}));
+        } catch (_) {
+            // sessionStorage may be unavailable in hardened browser modes.
+        }
+        window.location.reload();
+    }
+
+    try {
+        const queuedNotification = window.sessionStorage.getItem('stempeluhr.notification');
+        if (queuedNotification) {
+            window.sessionStorage.removeItem('stempeluhr.notification');
+            const parsed = JSON.parse(queuedNotification);
+            if (parsed?.message) showToast(parsed.message, parsed.type || 'success');
+        }
+    } catch (_) {
+        // Ignore invalid or unavailable session storage.
     }
 
     function statusHtml(status, large = false) {
@@ -591,6 +698,174 @@
             button.disabled = false;
         }
     });
+
+    const vacationCalendarRoot = document.getElementById('vacationCalendarRoot');
+    if (vacationCalendarRoot) {
+        const employeeSearch = document.getElementById('vacationEmployeeSearch');
+        const hideFree = document.getElementById('vacationHideFree');
+        const employeeRows = Array.from(document.querySelectorAll('[data-employee-row]'));
+        const calendarEmpty = document.getElementById('vacationCalendarEmpty');
+
+        const filterVacationRows = () => {
+            const query = normalizeSearch(employeeSearch?.value || '');
+            const onlyWithVacation = Boolean(hideFree?.checked);
+            let visible = 0;
+            employeeRows.forEach(row => {
+                const matchesSearch = !query || normalizeSearch(row.dataset.search).includes(query);
+                const matchesVacation = !onlyWithVacation || row.dataset.hasVacation === '1';
+                row.hidden = !(matchesSearch && matchesVacation);
+                if (!row.hidden) visible++;
+            });
+            if (calendarEmpty) calendarEmpty.hidden = visible > 0;
+        };
+        employeeSearch?.addEventListener('input', filterVacationRows);
+        hideFree?.addEventListener('change', filterVacationRows);
+
+        const syncVacationFormDates = form => {
+            if (!form?.elements?.start_date || !form?.elements?.end_date || !form?.elements?.portion) return;
+            const start = form.elements.start_date;
+            const end = form.elements.end_date;
+            const portion = form.elements.portion;
+            end.min = start.value || end.min;
+            if (start.value && (!end.value || end.value < start.value)) end.value = start.value;
+            const halfDay = portion.value !== 'FULL';
+            if (halfDay && start.value) end.value = start.value;
+            end.readOnly = halfDay;
+            end.classList.toggle('is-readonly', halfDay);
+        };
+
+        const vacationForms = [
+            document.getElementById('vacationCalendarCreateForm'),
+            document.getElementById('vacationCalendarEditForm'),
+            document.getElementById('vacationRequestForm')
+        ].filter(Boolean);
+        vacationForms.forEach(form => {
+            form.elements.start_date?.addEventListener('change', () => syncVacationFormDates(form));
+            form.elements.end_date?.addEventListener('change', () => syncVacationFormDates(form));
+            form.elements.portion?.addEventListener('change', () => syncVacationFormDates(form));
+            syncVacationFormDates(form);
+        });
+
+        const createForm = document.getElementById('vacationCalendarCreateForm');
+        if (createForm) {
+            createForm.addEventListener('submit', async event => {
+                event.preventDefault();
+                const submit = createForm.querySelector('[type="submit"]');
+                setButtonLoading(submit, true);
+                try {
+                    await apiPost('/api/absence/create', Object.fromEntries(new FormData(createForm).entries()));
+                    queueToastAfterReload('Der Urlaub wurde eingetragen und ist jetzt im Kalender sichtbar.', 'success');
+                } catch (error) {
+                    showToast(error.message, 'danger');
+                    setButtonLoading(submit, false);
+                }
+            });
+        }
+
+        const editForm = document.getElementById('vacationCalendarEditForm');
+        const editEmployee = document.getElementById('vacationEditEmployee');
+        document.addEventListener('click', event => {
+            const button = event.target.closest('.vacation-calendar-edit');
+            if (!button || !editForm) return;
+            editForm.elements.absenceId.value = button.dataset.absenceId || '';
+            editForm.elements.start_date.value = button.dataset.startDate || '';
+            editForm.elements.end_date.value = button.dataset.endDate || '';
+            editForm.elements.portion.value = button.dataset.portion || 'FULL';
+            editForm.elements.note.value = button.dataset.note || '';
+            if (editEmployee) editEmployee.textContent = button.dataset.employeeName || '';
+            syncVacationFormDates(editForm);
+        });
+
+        if (editForm) {
+            editForm.addEventListener('submit', async event => {
+                event.preventDefault();
+                const submit = editForm.querySelector('[type="submit"]');
+                setButtonLoading(submit, true);
+                try {
+                    await apiPost('/api/absence/update', Object.fromEntries(new FormData(editForm).entries()));
+                    queueToastAfterReload('Der Urlaub wurde aktualisiert.', 'success');
+                } catch (error) {
+                    showToast(error.message, 'danger');
+                    setButtonLoading(submit, false);
+                }
+            });
+        }
+
+        const deleteVacation = document.getElementById('vacationCalendarDelete');
+        if (deleteVacation && editForm) {
+            deleteVacation.addEventListener('click', async () => {
+                const absenceId = editForm.elements.absenceId.value;
+                if (!absenceId || !window.confirm('Diesen Urlaubseintrag wirklich löschen? Der ursprüngliche Antrag bleibt im Archiv erhalten.')) return;
+                setButtonLoading(deleteVacation, true);
+                try {
+                    await apiPost('/api/absence/delete', {absenceId});
+                    queueToastAfterReload('Der Urlaubseintrag wurde gelöscht. Antragsdaten bleiben erhalten.', 'success');
+                } catch (error) {
+                    showToast(error.message, 'danger');
+                    setButtonLoading(deleteVacation, false);
+                }
+            });
+        }
+
+        const requestForm = document.getElementById('vacationRequestForm');
+        if (requestForm) {
+            requestForm.addEventListener('submit', async event => {
+                event.preventDefault();
+                const submit = requestForm.querySelector('[type="submit"]');
+                setButtonLoading(submit, true);
+                try {
+                    await apiPost('/api/vacation-request/create', Object.fromEntries(new FormData(requestForm).entries()));
+                    queueToastAfterReload('Der Urlaubsantrag wurde gespeichert und an die Administration übermittelt.', 'success');
+                } catch (error) {
+                    showToast(error.message, 'danger');
+                    setButtonLoading(submit, false);
+                }
+            });
+        }
+
+        const decisionForm = document.getElementById('vacationDecisionForm');
+        const decisionEmployee = document.getElementById('vacationDecisionEmployee');
+        const decisionPeriod = document.getElementById('vacationDecisionPeriod');
+        const decisionDays = document.getElementById('vacationDecisionDays');
+        const decisionRequestNote = document.getElementById('vacationDecisionRequestNote');
+        document.addEventListener('click', event => {
+            const button = event.target.closest('.vacation-request-review');
+            if (!button || !decisionForm) return;
+            decisionForm.elements.requestId.value = button.dataset.requestId || '';
+            decisionForm.elements.decision.value = 'APPROVED';
+            decisionForm.elements.decision_note.value = '';
+            if (decisionEmployee) decisionEmployee.textContent = button.dataset.employeeName || '';
+            if (decisionPeriod) decisionPeriod.textContent = button.dataset.period || '';
+            if (decisionDays) decisionDays.textContent = `${button.dataset.days || '0,0'} Urlaubstage`;
+            if (decisionRequestNote) {
+                const note = button.dataset.note || '';
+                decisionRequestNote.textContent = note ? `Hinweis: ${note}` : '';
+                decisionRequestNote.hidden = !note;
+            }
+        });
+
+        if (decisionForm) {
+            decisionForm.addEventListener('submit', async event => {
+                event.preventDefault();
+                const submit = decisionForm.querySelector('[type="submit"]');
+                const data = Object.fromEntries(new FormData(decisionForm).entries());
+                setButtonLoading(submit, true);
+                try {
+                    const result = await apiPost('/api/vacation-request/decision', data);
+                    const approved = result.status === 'APPROVED';
+                    queueToastAfterReload(
+                        approved
+                            ? `Der Antrag von ${result.employee_name} wurde genehmigt und im Kalender eingetragen.`
+                            : `Der Antrag von ${result.employee_name} wurde abgelehnt und archiviert.`,
+                        approved ? 'success' : 'info'
+                    );
+                } catch (error) {
+                    showToast(error.message, 'danger');
+                    setButtonLoading(submit, false);
+                }
+            });
+        }
+    }
 
     if (document.getElementById('employeeTable')) {
         refreshDashboard();

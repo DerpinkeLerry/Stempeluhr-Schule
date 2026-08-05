@@ -116,3 +116,18 @@ Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.
 - vollständiger SQLite-Import in einer Transaktion mit Rollback bei Fehlern
 - Text- und JSON-Prüfberichte unter `data/import-reports`
 - ausführliche Anleitung unter `tools/README_MYSQL_IMPORT.md`
+
+## Schema Version 3 – Urlaubskalender und Antragsworkflow
+
+- Neuer Navigationspunkt **Urlaubskalender** direkt neben den Feiertagen für Administration und Mitarbeiter.
+- Moderne Monatsplanung mit aktiven Mitarbeitern, festen Namensspalten, Wochenend- und Feiertagsmarkierung, Suche und Filter „Nur mit Urlaub“.
+- Mitarbeiter sehen ausschließlich genehmigte Urlaube der aktuell angestellten Mitarbeiter; Krankheit, Schule, sonstige Abwesenheiten, interne Notizen und fremde Kontostände bleiben verborgen.
+- Administration kann Urlaube direkt eintragen, bearbeiten und löschen sowie alle Urlaubskonten des ausgewählten Jahres kompakt vergleichen.
+- Mitarbeiter können ganze oder halbe Urlaubstage beantragen.
+- Administration erhält eine offene Antragszahl in der Navigation und kann Anträge genehmigen oder ablehnen.
+- Jeder Antrag wird dauerhaft in `vacation_request` gespeichert. Status, Antragstext, Entscheidung, Entscheidungsnotiz, Bearbeitungszeitpunkt und bearbeitende Administration bleiben im Archiv aufrufbar.
+- Eine Genehmigung erzeugt automatisch einen verknüpften Urlaubseintrag. Wird dieser später gelöscht, bleibt der ursprüngliche Antrag erhalten.
+- Resturlaub aus dem regulären Jahresanspruch wird automatisch in das Folgejahr übertragen. Nicht genutzter Übertrag verfällt nach dem 31. März; älterer Übertrag wird nicht erneut weitergetragen.
+- Direkte Urlaubseinträge, Änderungen und neue Anträge werden serverseitig blockiert, wenn der verfügbare Urlaub nicht ausreicht.
+- Große Benachrichtigungen mit Statussymbol, klarer Überschrift, längerer Sichtbarkeit und Fortschrittsbalken zeigen an, wann eine Meldung automatisch verschwindet. Der Countdown pausiert beim Darüberfahren oder Fokussieren.
+- Datenbankschema auf `PRAGMA user_version = 3` angehoben; vorhandene Version-2-Datenbanken erhalten die neue Antragstabelle ohne Umbau der bestehenden Zeiterfassungstabellen.

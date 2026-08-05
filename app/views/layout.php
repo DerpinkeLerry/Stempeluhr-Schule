@@ -65,6 +65,11 @@ $navActive = static function (string $path) use ($requestPath): string {
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z"/></svg>
                         Feiertage
                     </a>
+                    <a class="nav-link<?= $navActive('/vacation-calendar') ?>" href="<?= h(url('/vacation-calendar')) ?>">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-3"/></svg>
+                        Urlaubskalender
+                        <?php if ($isAdmin && $pendingVacationRequestCount > 0): ?><span class="nav-count-badge"><?= min(99, (int)$pendingVacationRequestCount) ?></span><?php endif; ?>
+                    </a>
                 </div>
 
                 <div class="navbar-user">
@@ -91,10 +96,11 @@ $navActive = static function (string $path) use ($requestPath): string {
         <?php if ($isLoggedIn): ?>
             <div class="flash-stack" aria-live="polite">
                 <?php foreach ($flash as $message): ?>
-                    <div class="alert alert-<?= h($message['type']) ?> alert-dismissible fade show" role="alert">
+                    <div class="alert alert-<?= h($message['type']) ?> alert-dismissible fade show app-flash-notification" role="alert" data-notification-delay="7000">
                         <span class="alert-mark" aria-hidden="true"></span>
-                        <span><?= h($message['text']) ?></span>
+                        <span class="flash-message"><?= h($message['text']) ?></span>
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Schließen"></button>
+                        <span class="notification-progress" aria-hidden="true"><span></span></span>
                     </div>
                 <?php endforeach; ?>
             </div>
@@ -114,7 +120,7 @@ $navActive = static function (string $path) use ($requestPath): string {
 </footer>
 <?php endif; ?>
 
-<div class="toast-container position-fixed bottom-0 end-0 p-3" id="appToastContainer" aria-live="polite" aria-atomic="true"></div>
+<div class="toast-container position-fixed top-0 end-0 p-3" id="appToastContainer" aria-live="polite" aria-atomic="true"></div>
 
 <script>
 window.STEMPELUHR = {

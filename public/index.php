@@ -48,6 +48,9 @@ switch ($path) {
     case '/holidays':
         $controller->pageHolidays();
         break;
+    case '/vacation-calendar':
+        $controller->pageVacationCalendar();
+        break;
     case '/api/status':
         $controller->apiStatus();
         break;
@@ -68,6 +71,12 @@ switch ($path) {
         break;
     case '/api/vacation/update':
         $controller->apiVacationUpdate();
+        break;
+    case '/api/vacation-request/create':
+        $controller->apiVacationRequestCreate();
+        break;
+    case '/api/vacation-request/decision':
+        $controller->apiVacationRequestDecision();
         break;
     case '/api/absence/create':
         $controller->apiAbsenceCreate();

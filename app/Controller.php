@@ -15,6 +15,10 @@ final class Controller
         start_session();
         $flash = $_SESSION['flash'] ?? [];
         $_SESSION['flash'] = [];
+        $pendingVacationRequestCount = 0;
+        if (!empty($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'admin') {
+            $pendingVacationRequestCount = $this->service->countPendingVacationRequests();
+        }
         extract($vars, EXTR_SKIP);
         ob_start();
         require __DIR__ . '/views/' . $view . '.php';
@@ -175,6 +179,100 @@ final class Controller
         }
         $holidays = $this->service->listHolidaysForYear($region, $year);
         $this->render('holidays', compact('region', 'year', 'holidays'), 'Stempeluhr - Feiertage');
+    }
+
+    public function pageVacationCalendar(): void
+    {
+        $currentUserId = require_auth(true);
+        $isAdmin = ($_SESSION['role'] ?? '') === 'admin';
+        $berlinNow = new DateTimeImmutable('now', new DateTimeZone('Europe/Berlin'));
+        $currentYear = (int)$berlinNow->format('Y');
+        $currentMonth = (int)$berlinNow->format('n');
+        $year = (int)($_GET['year'] ?? $currentYear);
+        $month = (int)($_GET['month'] ?? $currentMonth);
+        if ($year < 1970 || $year > 2200) {
+            $year = $currentYear;
+        }
+        if ($month < 1 || $month > 12) {
+            $month = $currentMonth;
+        }
+
+        $monthStart = sprintf('%04d-%02d-01', $year, $month);
+        $monthEnd = (new DateTimeImmutable($monthStart . ' 00:00:00', new DateTimeZone('UTC')))
+            ->modify('last day of this month')
+            ->format('Y-m-d');
+        $employees = $this->service->listActiveEmployeesForVacationCalendar();
+        $vacations = $this->service->listVacationAbsencesForPeriod($monthStart, $monthEnd);
+        $vacationsByEmployee = [];
+        foreach ($vacations as $vacation) {
+            $vacationsByEmployee[(int)$vacation['employee_id']][] = $vacation;
+        }
+
+        $region = (string)cfg('default_holiday_region', 'DE-BY-KF');
+        $holidays = $this->service->listHolidaysForYear($region, $year);
+        $holidaysByDay = [];
+        foreach ($holidays as $holiday) {
+            $holidaysByDay[(string)$holiday['day']] = (string)$holiday['name'];
+        }
+
+        $today = $berlinNow->format('Y-m-d');
+        $awayToday = [];
+        foreach ($vacations as $vacation) {
+            if ((string)$vacation['start_date'] <= $today && (string)$vacation['end_date'] >= $today) {
+                $awayToday[(int)$vacation['employee_id']] = true;
+            }
+        }
+
+        $vacationAccounts = [];
+        if ($isAdmin) {
+            foreach ($employees as $employee) {
+                $vacationAccounts[(int)$employee['id']] = $this->service->getVacationAccount((int)$employee['id'], $year);
+            }
+            $requestStatus = strtoupper((string)($_GET['request_status'] ?? 'PENDING'));
+            if (!in_array($requestStatus, ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'ALL'], true)) {
+                $requestStatus = 'PENDING';
+            }
+            $requestsPerPage = 30;
+            $requestPage = max(1, (int)($_GET['requests_page'] ?? 1));
+            $requestCount = $this->service->countVacationRequestsForAdmin($requestStatus);
+            $requestPageCount = max(1, (int)ceil($requestCount / $requestsPerPage));
+            $requestPage = min($requestPage, $requestPageCount);
+            $requests = $this->service->listVacationRequestsForAdmin(
+                $requestStatus,
+                $requestsPerPage,
+                ($requestPage - 1) * $requestsPerPage
+            );
+            $ownVacationAccount = null;
+        } else {
+            $requestStatus = 'ALL';
+            $requestCount = 0;
+            $requestPage = 1;
+            $requestPageCount = 1;
+            $requests = $this->service->listVacationRequestsForEmployee($currentUserId);
+            $ownVacationAccount = $this->service->getVacationAccount($currentUserId, $year);
+        }
+
+        $this->render('vacation_calendar', compact(
+            'isAdmin',
+            'currentUserId',
+            'year',
+            'month',
+            'monthStart',
+            'monthEnd',
+            'employees',
+            'vacations',
+            'vacationsByEmployee',
+            'holidaysByDay',
+            'today',
+            'awayToday',
+            'vacationAccounts',
+            'ownVacationAccount',
+            'requests',
+            'requestStatus',
+            'requestCount',
+            'requestPage',
+            'requestPageCount'
+        ), 'Stempeluhr - Urlaubskalender');
     }
 
     public function pageMe(): void
@@ -423,6 +521,49 @@ final class Controller
             json_response(['ok' => false, 'error' => $e->getMessage()], 400);
         } catch (Throwable) {
             json_response(['ok' => false, 'error' => 'Urlaubskonto konnte nicht gespeichert werden'], 500);
+        }
+    }
+
+    public function apiVacationRequestCreate(): never
+    {
+        require_post();
+        verify_csrf();
+        $employeeId = require_auth(true);
+
+        try {
+            $requestId = $this->service->createVacationRequest(
+                $employeeId,
+                (string)($_POST['start_date'] ?? ''),
+                (string)($_POST['end_date'] ?? ''),
+                (string)($_POST['note'] ?? ''),
+                (string)($_POST['portion'] ?? 'FULL')
+            );
+            json_response(['ok' => true, 'requestId' => $requestId]);
+        } catch (RuntimeException $e) {
+            json_response(['ok' => false, 'error' => $e->getMessage()], 400);
+        } catch (Throwable) {
+            json_response(['ok' => false, 'error' => 'Urlaubsantrag konnte nicht gespeichert werden'], 500);
+        }
+    }
+
+    public function apiVacationRequestDecision(): never
+    {
+        require_post();
+        verify_csrf();
+        $adminId = require_admin(true);
+
+        try {
+            $result = $this->service->decideVacationRequest(
+                (int)($_POST['requestId'] ?? 0),
+                $adminId,
+                (string)($_POST['decision'] ?? ''),
+                (string)($_POST['decision_note'] ?? '')
+            );
+            json_response(['ok' => true] + $result);
+        } catch (RuntimeException $e) {
+            json_response(['ok' => false, 'error' => $e->getMessage()], 400);
+        } catch (Throwable) {
+            json_response(['ok' => false, 'error' => 'Urlaubsantrag konnte nicht bearbeitet werden'], 500);
         }
     }
 

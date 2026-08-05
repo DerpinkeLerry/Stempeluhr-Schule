@@ -11,6 +11,10 @@ PHP-Anwendung zur Arbeitszeit-, Pausen-, Abwesenheits- und Urlaubsverwaltung mit
 - aktive und inaktive Beschäftigte ohne Verlust ihrer Historie
 - historisierte Arbeitszeitmodelle pro Wochentag
 - Urlaubskonto pro Kalenderjahr mit Anspruch, Übertrag und Korrektur
+- gemeinsamer Urlaubskalender für alle aktiven Mitarbeiter
+- dauerhaftes Urlaubsantragsarchiv mit Genehmigung oder Ablehnung durch die Administration
+- automatische Übernahme ungenutzten Jahresurlaubs ins Folgejahr; Nutzung des Übertrags nur bis 31. März
+- serverseitige Sperre bei nicht ausreichendem Urlaubsbestand
 - ganze sowie halbe Urlaubstage vormittags oder nachmittags
 - Krankheit, Schule und sonstige Abwesenheiten
 - Wochenzettel als PDF mit Sollzeit und Differenz
@@ -54,7 +58,7 @@ Die Datenbank liegt unter:
 data/stempeluhr.sqlite
 ```
 
-Das Projekt verwendet Schema-Version 2. Eine ältere Projektdatenbank wird beim ersten Aufruf automatisch strukturell migriert. Vor jedem Update muss die SQLite-Datei trotzdem separat gesichert werden.
+Das Projekt verwendet Schema-Version 3. Eine ältere Projektdatenbank wird beim ersten Aufruf automatisch strukturell migriert. Version 3 ergänzt das dauerhafte Urlaubsantragsarchiv. Vor jedem Update muss die SQLite-Datei trotzdem separat gesichert werden.
 
 Die vollständige Tabellenbeschreibung steht in:
 
@@ -69,7 +73,10 @@ Die mitgelieferte Datenbank wurde bereits auf Version 2 umgestellt. Der spätere
 - Personalnummern sind für neu angelegte Mitarbeiter Pflicht und eindeutig.
 - Mitarbeiter werden beim Entfernen nur deaktiviert. Historische Daten bleiben erhalten.
 - Änderungen am Wochenplan gelten ab einem wählbaren Datum und überschreiben keine Vergangenheit.
-- Urlaub wird aus den Abwesenheiten berechnet; halbe Tage zählen als `0,5`.
+- Urlaub wird aus den genehmigten Abwesenheiten berechnet; halbe Tage zählen als `0,5`.
+- Ungenutzter regulärer Jahresurlaub wird automatisch ins Folgejahr übertragen. Dieser Übertrag kann nur für Urlaubstage bis einschließlich 31. März verwendet werden und verfällt danach.
+- Urlaubsanträge und direkte Urlaubseinträge werden blockiert, sobald der verfügbare Bestand nicht ausreicht.
+- Urlaubsanträge bleiben nach Genehmigung oder Ablehnung vollständig im Admin-Archiv erhalten.
 - Ein ganzer Abwesenheitstag wird beim tatsächlichen Einstempeln für diesen Tag entfernt. Ein halber Urlaubstag bleibt bestehen.
 - Zeitstempel in `work_session` und `break_session` werden in UTC gespeichert.
 
@@ -105,6 +112,7 @@ Integrationstests mit aktiviertem PDO_SQLite:
 
 ```bash
 php tests/TimeClockServiceTest.php
+php tests/VacationWorkflowTest.php
 ```
 
 Zusätzlich empfiehlt sich nach einer Datenbankmigration:
@@ -118,7 +126,7 @@ PRAGMA foreign_key_check;
 
 ```text
 app/                 PHP-Code, Services und Views
-database/schema.sql  vollständiges Schema Version 2
+database/schema.sql  vollständiges Schema Version 3
 database/STRUCTURE.md Datenmodell und Migrationshinweise
 data/                SQLite-Datenbank
 public/              einziger öffentlicher Webordner

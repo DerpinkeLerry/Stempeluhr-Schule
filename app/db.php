@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const DATABASE_SCHEMA_VERSION = 2;
+const DATABASE_SCHEMA_VERSION = 3;
 
 function db(): PDO
 {
@@ -42,15 +42,18 @@ function db(): PDO
 function migrate_database(PDO $pdo): void
 {
     $version = (int)$pdo->query('PRAGMA user_version')->fetchColumn();
-    $alreadyCurrent = $version >= DATABASE_SCHEMA_VERSION
-        && table_has_column($pdo, 'employee', 'personnel_number')
+    $coreSchemaCurrent = table_has_column($pdo, 'employee', 'personnel_number')
         && table_has_column($pdo, 'employee', 'weekly_hours')
         && table_has_column($pdo, 'work_session', 'legacy_worktime_id')
         && table_has_column($pdo, 'break_session', 'legacy_break_id')
         && table_has_column($pdo, 'absence', 'portion')
         && table_has_column($pdo, 'public_holiday', 'source');
 
-    if ($alreadyCurrent) {
+    // Version 3 only adds the persistent vacation_request table. The schema is
+    // executed directly after this migration and can create that table without
+    // rebuilding the established time-tracking tables.
+    if ($version >= 2 && $coreSchemaCurrent) {
+        $pdo->exec('PRAGMA user_version = ' . DATABASE_SCHEMA_VERSION);
         return;
     }
 

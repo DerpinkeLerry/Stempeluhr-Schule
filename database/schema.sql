@@ -109,6 +109,28 @@ CREATE TABLE IF NOT EXISTS absence (
     CHECK(portion = 'FULL' OR type = 'VACATION')
 );
 
+CREATE TABLE IF NOT EXISTS vacation_request (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id INTEGER NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    portion TEXT NOT NULL DEFAULT 'FULL' CHECK(portion IN ('FULL', 'AM', 'PM')),
+    note TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')),
+    requested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    decided_at TEXT,
+    decided_by INTEGER,
+    decision_note TEXT NOT NULL DEFAULT '',
+    absence_id INTEGER,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(employee_id) REFERENCES employee(id) ON DELETE RESTRICT,
+    FOREIGN KEY(decided_by) REFERENCES employee(id) ON DELETE SET NULL,
+    FOREIGN KEY(absence_id) REFERENCES absence(id) ON DELETE SET NULL,
+    CHECK(end_date >= start_date),
+    CHECK(portion = 'FULL' OR start_date = end_date)
+);
+
 CREATE TABLE IF NOT EXISTS public_holiday (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     region TEXT NOT NULL,
@@ -149,6 +171,8 @@ CREATE INDEX IF NOT EXISTS idx_vacation_employee_year ON vacation_account(employ
 CREATE INDEX IF NOT EXISTS idx_work_employee_start ON work_session(employee_id, started_at);
 CREATE INDEX IF NOT EXISTS idx_break_work_start ON break_session(work_session_id, started_at);
 CREATE INDEX IF NOT EXISTS idx_absence_employee_dates ON absence(employee_id, start_date, end_date);
+CREATE INDEX IF NOT EXISTS idx_vacation_request_employee_status ON vacation_request(employee_id, status, start_date, end_date);
+CREATE INDEX IF NOT EXISTS idx_vacation_request_status_requested ON vacation_request(status, requested_at DESC);
 CREATE INDEX IF NOT EXISTS idx_holiday_region_day ON public_holiday(region, day);
 CREATE INDEX IF NOT EXISTS idx_overtime_day ON overtime_event(day);
 CREATE UNIQUE INDEX IF NOT EXISTS one_open_work ON work_session(employee_id) WHERE ended_at IS NULL;

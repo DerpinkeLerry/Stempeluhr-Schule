@@ -342,7 +342,8 @@ $tests['Urlaubskonto zählt halbe Tage'] = static function (): void {
     $account = $service->getVacationAccount($employeeId, 2026);
     assertSameValue(31.0, (float)$account['total_days'], 'Das verfügbare Urlaubskonto ist falsch');
     assertSameValue(0.5, (float)$account['used_days'], 'Der halbe Urlaubstag wurde falsch gezählt');
-    assertSameValue(30.5, (float)$account['remaining_days'], 'Der Resturlaub ist falsch');
+    assertSameValue(28.5, (float)$account['remaining_days'], 'Nach dem 31.03. darf alter Übertrag nicht mehr verfügbar sein');
+    assertSameValue(2.0, (float)$account['expired_carryover_days'], 'Nicht genutzter Übertrag muss als verfallen ausgewiesen werden');
 };
 
 $passed = 0;
