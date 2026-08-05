@@ -312,6 +312,42 @@
         button.classList.toggle('is-loading', loading);
     }
 
+    function applyEmployeeTableFilters() {
+        const table = document.getElementById('employeeTable');
+        if (!table) return;
+
+        const rows = Array.from(table.querySelectorAll('tbody tr[data-employee-id]'));
+        const employeeSearch = document.getElementById('employeeSearch');
+        const showInactiveEmployees = document.getElementById('showInactiveEmployees');
+        const empty = document.getElementById('employeeSearchEmpty');
+        if (!rows.length) {
+            if (empty) empty.hidden = true;
+            return;
+        }
+
+        const query = normalizeSearch(employeeSearch?.value || '');
+        const includeInactive = Boolean(showInactiveEmployees?.checked);
+        let visible = 0;
+        rows.forEach(row => {
+            const matchesEmployment = includeInactive || row.dataset.active === '1';
+            const matchesSearch = !query || normalizeSearch(row.dataset.search).includes(query);
+            const matches = matchesEmployment && matchesSearch;
+            row.hidden = !matches;
+            if (matches) visible++;
+        });
+
+        if (empty) {
+            empty.hidden = visible !== 0;
+            if (visible === 0) {
+                empty.textContent = query
+                    ? 'Keine passenden Mitarbeiter gefunden.'
+                    : includeInactive
+                        ? 'Keine Mitarbeiter vorhanden.'
+                        : 'Keine aktiven Mitarbeiter vorhanden.';
+            }
+        }
+    }
+
     function tickDashboard() {
         const table = document.getElementById('employeeTable');
         if (!table) return;
@@ -337,10 +373,12 @@
                 dashboardState.set(item.employee.id, state);
                 const row = table.querySelector(`[data-employee-id="${item.employee.id}"]`);
                 if (!row) return;
+                row.dataset.active = Number(item.employee.active) === 1 ? '1' : '0';
                 const statusCell = row.querySelector('.status-cell');
                 if (statusCell) statusCell.innerHTML = statusHtml(item.status);
                 if (tableBody) tableBody.appendChild(row);
             });
+            applyEmployeeTableFilters();
             tickDashboard();
         } catch (_) {
             // Die vorhandenen Werte bleiben sichtbar, wenn ein kurzer Netzfehler auftritt.
@@ -653,19 +691,11 @@
     }
 
     const employeeSearch = document.getElementById('employeeSearch');
-    if (employeeSearch) {
-        const rows = Array.from(document.querySelectorAll('#employeeTable tbody tr[data-employee-id]'));
-        const empty = document.getElementById('employeeSearchEmpty');
-        employeeSearch.addEventListener('input', () => {
-            const query = normalizeSearch(employeeSearch.value);
-            let visible = 0;
-            rows.forEach(row => {
-                const matches = !query || normalizeSearch(row.dataset.search).includes(query);
-                row.hidden = !matches;
-                if (matches) visible++;
-            });
-            if (empty) empty.hidden = visible !== 0;
-        });
+    const showInactiveEmployees = document.getElementById('showInactiveEmployees');
+    if (employeeSearch || showInactiveEmployees) {
+        employeeSearch?.addEventListener('input', applyEmployeeTableFilters);
+        showInactiveEmployees?.addEventListener('change', applyEmployeeTableFilters);
+        applyEmployeeTableFilters();
     }
 
     const reportSearch = document.getElementById('reportEmployeeSearch');

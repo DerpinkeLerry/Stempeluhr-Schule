@@ -1,3 +1,11 @@
+## Mitarbeiterübersicht: aktive Beschäftigte als Standard
+
+- In der Admin-Mitarbeiterübersicht werden standardmäßig nur aktiv beschäftigte Mitarbeiter angezeigt.
+- Ein kompakter Schalter „Alle anzeigen“ blendet inaktive Mitarbeiter bei Bedarf ein.
+- Suche und Live-Sortierung berücksichtigen den gewählten Filter gemeinsam.
+- Die Kennzahl im Kopf zeigt jetzt die Anzahl der aktiven Mitarbeiter.
+- Inaktive Mitarbeiter bleiben vollständig erhalten und können weiterhin bearbeitet oder reaktiviert werden.
+
 # Behobene Punkte
 
 1. **Wochenzettel drucken**

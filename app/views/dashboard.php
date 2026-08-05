@@ -1,5 +1,7 @@
 <?php
 declare(strict_types=1);
+$activeEmployeeCount = count(array_filter($employees, static fn(array $employee): bool => (int)($employee['active'] ?? 0) === 1));
+$inactiveEmployeeCount = count($employees) - $activeEmployeeCount;
 $workingCount = 0;
 $breakCount = 0;
 foreach ($statuses as $itemStatus) {
@@ -30,7 +32,7 @@ foreach ($statuses as $itemStatus) {
         <span class="stat-icon">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         </span>
-        <div><strong><?= count($employees) ?></strong><span>Mitarbeiter gesamt</span></div>
+        <div><strong><?= $activeEmployeeCount ?></strong><span>Aktive Mitarbeiter</span></div>
     </article>
     <article class="stat-card stat-card-positive">
         <span class="stat-icon">
@@ -128,10 +130,20 @@ foreach ($statuses as $itemStatus) {
             <h2>Teamstatus</h2>
             <p>Die Arbeitszeiten werden automatisch jede Sekunde aktualisiert.</p>
         </div>
-        <label class="search-field" for="employeeSearch">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-            <input id="employeeSearch" type="search" placeholder="Mitarbeiter suchen" autocomplete="off">
-        </label>
+        <div class="employee-list-tools">
+            <label class="employee-visibility-switch" for="showInactiveEmployees">
+                <input id="showInactiveEmployees" type="checkbox" role="switch" aria-describedby="showInactiveEmployeesHint">
+                <span class="employee-switch-track" aria-hidden="true"><span></span></span>
+                <span class="employee-switch-copy">
+                    <strong>Alle anzeigen</strong>
+                    <small id="showInactiveEmployeesHint"><?= $inactiveEmployeeCount ?> inaktiv</small>
+                </span>
+            </label>
+            <label class="search-field" for="employeeSearch">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+                <input id="employeeSearch" type="search" placeholder="Mitarbeiter suchen" autocomplete="off">
+            </label>
+        </div>
     </div>
     <div class="table-responsive">
         <table class="table employee-table align-middle mb-0" id="employeeTable">
@@ -155,7 +167,12 @@ foreach ($statuses as $itemStatus) {
                     if (strlen($initials) >= 2) break;
                 }
                 ?>
-                <tr data-employee-id="<?= $id ?>" data-search="<?= h(strtolower(($employee['personnel_number'] ?? '') . ' ' . $employee['name'] . ' ' . ($employee['email'] ?? '') . ' ' . ($employee['department'] ?? ''))) ?>">
+                <tr
+                    data-employee-id="<?= $id ?>"
+                    data-active="<?= (int)($employee['active'] ?? 0) ?>"
+                    data-search="<?= h(strtolower(($employee['personnel_number'] ?? '') . ' ' . $employee['name'] . ' ' . ($employee['email'] ?? '') . ' ' . ($employee['department'] ?? ''))) ?>"
+                    <?= (int)($employee['active'] ?? 0) === 1 ? '' : 'hidden' ?>
+                >
                     <td>
                         <div class="employee-identity">
                             <span class="employee-avatar" aria-hidden="true"><?= h($initials ?: 'M') ?></span>
