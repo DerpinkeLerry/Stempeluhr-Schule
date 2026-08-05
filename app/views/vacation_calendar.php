@@ -13,7 +13,9 @@ $statusClasses = ['PENDING' => 'request-pending', 'APPROVED' => 'request-approve
 $monthDate = new DateTimeImmutable($monthStart . ' 00:00:00', new DateTimeZone('UTC'));
 $previousMonth = $monthDate->modify('-1 month');
 $nextMonth = $monthDate->modify('+1 month');
-$requestDefaultDate = $monthEnd < $today ? $today : max($today, $monthStart);
+$previousYear = $year - 1;
+$nextYear = $year + 1;
+$requestDefaultDate = $periodEnd < $today ? $today : max($today, $periodStart);
 $daysInMonth = (int)$monthDate->format('t');
 $dayDates = [];
 for ($day = 1; $day <= $daysInMonth; $day++) {
@@ -27,6 +29,10 @@ for ($day = 1; $day <= $daysInMonth; $day++) {
         'today' => $date === $today,
     ];
 }
+
+$calendarPeriodLabel = $viewMode === 'year'
+    ? 'im Jahr ' . $year
+    : 'im ' . $monthNames[$month] . ' ' . $year;
 
 $employeeInitials = static function (string $name): string {
     $result = '';
@@ -51,6 +57,115 @@ if (!$isAdmin) {
         if (($request['status'] ?? '') === 'PENDING') $pendingOwnRequests++;
     }
 }
+
+// A stable, high-contrast employee palette keeps every person recognizable in
+// both calendar views. The same employee receives the same color for the whole page.
+$employeePalette = [
+    '#2F6FED', '#1C9A72', '#8B5CF6', '#E56B3F', '#C9446B', '#5F8D3E',
+    '#1687A7', '#8A6D3B', '#D9485F', '#3F7CAC', '#00A896', '#A855F7',
+    '#D97706', '#4F7D3A', '#2563A9', '#B4537A', '#5B6EC7', '#2B8A66',
+    '#C75D2C', '#7C5DB3', '#3D8D9B', '#A15C38', '#596F2D', '#9C3D54',
+];
+$employeeById = [];
+$employeeColorById = [];
+foreach ($employees as $employee) {
+    $employeeId = (int)$employee['id'];
+    $employeeById[$employeeId] = $employee;
+    // Multiplication by 7 distributes consecutive IDs across the palette while
+    // keeping the color stable even when employees are re-sorted or added.
+    $paletteIndex = (($employeeId * 7) + 3) % count($employeePalette);
+    $employeeColorById[$employeeId] = $employeePalette[$paletteIndex];
+}
+
+// The full-year view follows the compact planning-board model of the legacy
+// calendar: months run vertically, days horizontally, and overlapping vacations
+// are placed on the smallest possible number of tracks.
+$yearMatrixMonths = [];
+if ($viewMode === 'year') {
+    foreach ($monthNames as $monthNumber => $monthName) {
+        $matrixMonthStart = sprintf('%04d-%02d-01', $year, $monthNumber);
+        $matrixMonthDate = new DateTimeImmutable($matrixMonthStart, new DateTimeZone('UTC'));
+        $matrixMonthEnd = $matrixMonthDate->modify('last day of this month')->format('Y-m-d');
+        $matrixDaysInMonth = (int)$matrixMonthDate->format('t');
+        $matrixDays = [];
+        for ($day = 1; $day <= 31; $day++) {
+            if ($day > $matrixDaysInMonth) {
+                $matrixDays[] = ['outside' => true, 'day' => $day];
+                continue;
+            }
+            $date = sprintf('%04d-%02d-%02d', $year, $monthNumber, $day);
+            $dateObject = new DateTimeImmutable($date, new DateTimeZone('UTC'));
+            $matrixDays[] = [
+                'outside' => false,
+                'date' => $date,
+                'day' => $day,
+                'weekday' => (int)$dateObject->format('N'),
+                'holiday' => $holidaysByDay[$date] ?? '',
+                'today' => $date === $today,
+            ];
+        }
+
+        $segments = [];
+        $monthEmployeeIds = [];
+        foreach ($vacations as $vacation) {
+            $employeeId = (int)$vacation['employee_id'];
+            if (!isset($employeeById[$employeeId])) continue;
+            if ((string)$vacation['end_date'] < $matrixMonthStart || (string)$vacation['start_date'] > $matrixMonthEnd) continue;
+
+            $clipStart = max((string)$vacation['start_date'], $matrixMonthStart);
+            $clipEnd = min((string)$vacation['end_date'], $matrixMonthEnd);
+            $startDay = (int)date('j', strtotime($clipStart));
+            $endDay = (int)date('j', strtotime($clipEnd));
+            $span = $endDay - $startDay + 1;
+            $employee = $employeeById[$employeeId];
+            $name = (string)$employee['name'];
+            $portion = (string)($vacation['portion'] ?? 'FULL');
+            $segments[] = [
+                'vacation' => $vacation,
+                'employee' => $employee,
+                'employee_id' => $employeeId,
+                'search' => trim($name . ' ' . (string)$employee['department'] . ' ' . (string)$employee['personnel_number']),
+                'color' => $employeeColorById[$employeeId],
+                'initials' => $employeeInitials($name),
+                'start_day' => $startDay,
+                'end_day' => $endDay,
+                'span' => $span,
+                'portion' => $portion,
+                'period_label' => $periodLabel($vacation),
+                'bar_label' => $span >= 4 ? $name : $employeeInitials($name),
+            ];
+            $monthEmployeeIds[$employeeId] = true;
+        }
+
+        usort($segments, static function (array $a, array $b): int {
+            $startCompare = $a['start_day'] <=> $b['start_day'];
+            if ($startCompare !== 0) return $startCompare;
+            $endCompare = $b['end_day'] <=> $a['end_day'];
+            if ($endCompare !== 0) return $endCompare;
+            return strcmp((string)$a['employee']['name'], (string)$b['employee']['name']);
+        });
+
+        $trackEndDays = [];
+        foreach ($segments as $index => $segment) {
+            $track = 0;
+            while (isset($trackEndDays[$track]) && $segment['start_day'] <= $trackEndDays[$track]) {
+                $track++;
+            }
+            $trackEndDays[$track] = $segment['end_day'];
+            $segments[$index]['track'] = $track + 1;
+        }
+
+        $yearMatrixMonths[$monthNumber] = [
+            'name' => $monthName,
+            'days' => $matrixDays,
+            'segments' => $segments,
+            'track_count' => max(1, count($trackEndDays)),
+            'vacation_count' => count($segments),
+            'employee_count' => count($monthEmployeeIds),
+            'is_current' => $year === (int)date('Y', strtotime($today)) && $monthNumber === (int)date('n', strtotime($today)),
+        ];
+    }
+}
 ?>
 
 <div id="vacationCalendarRoot" data-is-admin="<?= $isAdmin ? '1' : '0' ?>">
@@ -58,7 +173,7 @@ if (!$isAdmin) {
         <div>
             <div class="eyebrow">Gemeinsame Planung</div>
             <h1>Urlaubskalender</h1>
-            <p>Genehmigte Urlaube aller aktuell angestellten Mitarbeiter</p>
+            <p>Genehmigte Urlaube aller aktuell angestellten Mitarbeiter – übersichtlich, modern und ohne sensible Abwesenheitsdaten.</p>
         </div>
         <div class="vacation-hero-actions">
             <?php if ($isAdmin): ?>
@@ -87,7 +202,7 @@ if (!$isAdmin) {
         </article>
         <article class="vacation-summary-card">
             <span class="summary-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z"/></svg></span>
-            <div><strong><?= count($vacations) ?></strong><span>Urlaubseinträge im <?= h($monthNames[$month]) ?></span></div>
+            <div><strong><?= count($vacations) ?></strong><span>Urlaubseinträge <?= h($calendarPeriodLabel) ?></span></div>
         </article>
         <article class="vacation-summary-card">
             <span class="summary-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l2 2 4-4M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z"/></svg></span>
@@ -102,27 +217,56 @@ if (!$isAdmin) {
     </section>
 
     <section class="surface-card vacation-calendar-card">
-        <div class="vacation-calendar-toolbar">
-            <div class="month-navigation" aria-label="Monatsnavigation">
-                <a class="calendar-nav-button" href="<?= h(url('/vacation-calendar?year=' . $previousMonth->format('Y') . '&month=' . $previousMonth->format('n'))) ?>" aria-label="Vorheriger Monat">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
-                </a>
-                <div class="month-navigation-title">
-                    <span>Planungsmonat</span>
-                    <strong><?= h($monthNames[$month]) ?> <?= (int)$year ?></strong>
-                </div>
-                <a class="calendar-nav-button" href="<?= h(url('/vacation-calendar?year=' . $nextMonth->format('Y') . '&month=' . $nextMonth->format('n'))) ?>" aria-label="Nächster Monat">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
-                </a>
+        <div class="vacation-calendar-toolbar<?= $viewMode === 'year' ? ' is-year-view' : '' ?>">
+            <div class="month-navigation" aria-label="<?= $viewMode === 'year' ? 'Jahresnavigation' : 'Monatsnavigation' ?>">
+                <?php if ($viewMode === 'year'): ?>
+                    <a class="calendar-nav-button" href="<?= h(url('/vacation-calendar?view=year&year=' . $previousYear . '&month=' . $month)) ?>" aria-label="Vorheriges Jahr">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+                    </a>
+                    <div class="month-navigation-title">
+                        <span>Planungsjahr</span>
+                        <strong><?= (int)$year ?></strong>
+                    </div>
+                    <a class="calendar-nav-button" href="<?= h(url('/vacation-calendar?view=year&year=' . $nextYear . '&month=' . $month)) ?>" aria-label="Nächstes Jahr">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                    </a>
+                <?php else: ?>
+                    <a class="calendar-nav-button" href="<?= h(url('/vacation-calendar?view=month&year=' . $previousMonth->format('Y') . '&month=' . $previousMonth->format('n'))) ?>" aria-label="Vorheriger Monat">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+                    </a>
+                    <div class="month-navigation-title">
+                        <span>Planungsmonat</span>
+                        <strong><?= h($monthNames[$month]) ?> <?= (int)$year ?></strong>
+                    </div>
+                    <a class="calendar-nav-button" href="<?= h(url('/vacation-calendar?view=month&year=' . $nextMonth->format('Y') . '&month=' . $nextMonth->format('n'))) ?>" aria-label="Nächster Monat">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                    </a>
+                <?php endif; ?>
             </div>
 
-            <form class="vacation-calendar-jump" method="get" action="<?= h(url('/vacation-calendar')) ?>">
-                <label class="visually-hidden" for="vacationCalendarMonth">Monat</label>
-                <select class="form-select" id="vacationCalendarMonth" name="month">
-                    <?php foreach ($monthNames as $number => $name): ?>
-                        <option value="<?= (int)$number ?>"<?= $number === $month ? ' selected' : '' ?>><?= h($name) ?></option>
-                    <?php endforeach; ?>
-                </select>
+            <nav class="vacation-view-switch" aria-label="Kalenderansicht">
+                <a class="<?= $viewMode === 'month' ? 'active' : '' ?>" href="<?= h(url('/vacation-calendar?view=month&year=' . $year . '&month=' . $month)) ?>" aria-current="<?= $viewMode === 'month' ? 'page' : 'false' ?>">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z"/></svg>
+                    Monat
+                </a>
+                <a class="<?= $viewMode === 'year' ? 'active' : '' ?>" href="<?= h(url('/vacation-calendar?view=year&year=' . $year . '&month=' . $month)) ?>" aria-current="<?= $viewMode === 'year' ? 'page' : 'false' ?>">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 10h16M9 10v9M14 10v9"/></svg>
+                    Jahr
+                </a>
+            </nav>
+
+            <form class="vacation-calendar-jump<?= $viewMode === 'year' ? ' is-year-view' : '' ?>" method="get" action="<?= h(url('/vacation-calendar')) ?>">
+                <input type="hidden" name="view" value="<?= h($viewMode) ?>">
+                <?php if ($viewMode === 'month'): ?>
+                    <label class="visually-hidden" for="vacationCalendarMonth">Monat</label>
+                    <select class="form-select" id="vacationCalendarMonth" name="month">
+                        <?php foreach ($monthNames as $number => $name): ?>
+                            <option value="<?= (int)$number ?>"<?= $number === $month ? ' selected' : '' ?>><?= h($name) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                <?php else: ?>
+                    <input type="hidden" name="month" value="<?= (int)$month ?>">
+                <?php endif; ?>
                 <label class="visually-hidden" for="vacationCalendarYear">Jahr</label>
                 <input class="form-control" id="vacationCalendarYear" name="year" type="number" min="1970" max="2200" value="<?= (int)$year ?>">
                 <button class="btn btn-outline-brand" type="submit">Anzeigen</button>
@@ -135,7 +279,7 @@ if (!$isAdmin) {
                 </label>
                 <label class="calendar-toggle">
                     <input id="vacationHideFree" type="checkbox">
-                    <span>Nur mit Urlaub</span>
+                    <span><?= $viewMode === 'year' ? 'Nur belegte Monate' : 'Nur mit Urlaub' ?></span>
                 </label>
             </div>
         </div>
@@ -145,90 +289,228 @@ if (!$isAdmin) {
             <span><i class="legend-swatch legend-weekend"></i> Wochenende</span>
             <span><i class="legend-swatch legend-holiday"></i> Feiertag</span>
             <?php if ($isAdmin): ?><span><i class="legend-swatch legend-edit"></i> Urlaub anklicken zum Bearbeiten</span><?php endif; ?>
+            <?php if ($viewMode === 'year'): ?><span class="year-view-hint">Mitarbeiterfarbe anklicken, um gezielt zu filtern.</span><?php endif; ?>
         </div>
 
-        <div class="vacation-timeline-scroll">
-            <div class="vacation-timeline" style="--calendar-days: <?= (int)$daysInMonth ?>">
-                <div class="vacation-timeline-header">
-                    <div class="calendar-employee-column calendar-employee-heading">Mitarbeiter</div>
-                    <div class="calendar-days-grid calendar-day-heading-grid">
-                        <?php foreach ($dayDates as $dayInfo): ?>
+        <?php if ($viewMode === 'month'): ?>
+            <div class="vacation-timeline-scroll">
+                <div class="vacation-timeline" style="--calendar-days: <?= (int)$daysInMonth ?>">
+                    <div class="vacation-timeline-header">
+                        <div class="calendar-employee-column calendar-employee-heading">Mitarbeiter</div>
+                        <div class="calendar-days-grid calendar-day-heading-grid">
+                            <?php foreach ($dayDates as $dayInfo): ?>
+                                <?php
+                                $classes = ['calendar-day-heading'];
+                                if ($dayInfo['weekday'] >= 6) $classes[] = 'is-weekend';
+                                if ($dayInfo['holiday'] !== '') $classes[] = 'is-holiday';
+                                if ($dayInfo['today']) $classes[] = 'is-today';
+                                ?>
+                                <div class="<?= h(implode(' ', $classes)) ?>" title="<?= h($dayInfo['holiday']) ?>">
+                                    <span><?= h($weekdayNames[$dayInfo['weekday']]) ?></span>
+                                    <strong><?= (int)$dayInfo['day'] ?></strong>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <div id="vacationTimelineRows">
+                        <?php foreach ($employees as $employeeIndex => $employee): ?>
                             <?php
-                            $classes = ['calendar-day-heading'];
-                            if ($dayInfo['weekday'] >= 6) $classes[] = 'is-weekend';
-                            if ($dayInfo['holiday'] !== '') $classes[] = 'is-holiday';
-                            if ($dayInfo['today']) $classes[] = 'is-today';
+                            $employeeId = (int)$employee['id'];
+                            $employeeVacations = $vacationsByEmployee[$employeeId] ?? [];
+                            $searchText = trim((string)$employee['name'] . ' ' . (string)$employee['department'] . ' ' . (string)$employee['personnel_number']);
+                            $employeeColor = $employeeColorById[$employeeId] ?? '#2F6FED';
                             ?>
-                            <div class="<?= h(implode(' ', $classes)) ?>" title="<?= h($dayInfo['holiday']) ?>">
-                                <span><?= h($weekdayNames[$dayInfo['weekday']]) ?></span>
-                                <strong><?= (int)$dayInfo['day'] ?></strong>
+                            <div class="vacation-timeline-row" style="--row-vacation-color: <?= h($employeeColor) ?>" data-employee-row data-has-vacation="<?= $employeeVacations ? '1' : '0' ?>" data-search="<?= h($searchText) ?>">
+                                <div class="calendar-employee-column">
+                                    <span class="calendar-employee-avatar"><?= h($employeeInitials((string)$employee['name'])) ?></span>
+                                    <span class="calendar-employee-copy">
+                                        <strong><?= h((string)$employee['name']) ?></strong>
+                                        <small><?= h((string)($employee['department'] ?: 'Ohne Abteilung')) ?></small>
+                                    </span>
+                                </div>
+                                <div class="calendar-days-grid calendar-row-grid">
+                                    <?php foreach ($dayDates as $dayInfo): ?>
+                                        <?php
+                                        $classes = ['calendar-day-cell'];
+                                        if ($dayInfo['weekday'] >= 6) $classes[] = 'is-weekend';
+                                        if ($dayInfo['holiday'] !== '') $classes[] = 'is-holiday';
+                                        if ($dayInfo['today']) $classes[] = 'is-today';
+                                        ?>
+                                        <span class="<?= h(implode(' ', $classes)) ?>" title="<?= h($dayInfo['holiday']) ?>"></span>
+                                    <?php endforeach; ?>
+
+                                    <?php foreach ($employeeVacations as $vacation): ?>
+                                        <?php
+                                        $clipStart = max((string)$vacation['start_date'], $monthStart);
+                                        $clipEnd = min((string)$vacation['end_date'], $monthEnd);
+                                        $startDay = (int)date('j', strtotime($clipStart));
+                                        $span = (int)((strtotime($clipEnd) - strtotime($clipStart)) / 86400) + 1;
+                                        $portion = (string)($vacation['portion'] ?? 'FULL');
+                                        $barLabel = $periodLabel($vacation);
+                                        $tag = $isAdmin ? 'button' : 'div';
+                                        ?>
+                                        <<?= $tag ?>
+                                            class="vacation-bar<?= $portion !== 'FULL' ? ' is-half is-' . strtolower($portion) : '' ?><?= $isAdmin ? ' vacation-calendar-edit' : '' ?>"
+                                            style="--bar-start: <?= $startDay ?>; --bar-span: <?= $span ?>"
+                                            title="<?= h((string)$employee['name'] . ' · ' . $barLabel) ?>"
+                                            <?php if ($isAdmin): ?>
+                                                type="button"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#vacationEditModal"
+                                                data-absence-id="<?= (int)$vacation['id'] ?>"
+                                                data-employee-name="<?= h((string)$employee['name']) ?>"
+                                                data-start-date="<?= h((string)$vacation['start_date']) ?>"
+                                                data-end-date="<?= h((string)$vacation['end_date']) ?>"
+                                                data-portion="<?= h($portion) ?>"
+                                                data-note="<?= h((string)$vacation['note']) ?>"
+                                            <?php endif; ?>
+                                        >
+                                            <span><?= h($portion === 'FULL' ? $barLabel : ($portionLabels[$portion] ?? $portion)) ?></span>
+                                        </<?= $tag ?>>
+                                    <?php endforeach; ?>
+                                </div>
                             </div>
                         <?php endforeach; ?>
                     </div>
                 </div>
-
-                <div id="vacationTimelineRows">
-                    <?php foreach ($employees as $employeeIndex => $employee): ?>
+            </div>
+        <?php else: ?>
+            <div class="vacation-employee-key" data-employee-key>
+                <div class="vacation-employee-key-heading">
+                    <div>
+                        <strong>Mitarbeiterfarben</strong>
+                        <span>Jede Farbe gehört dauerhaft zu einer Person.</span>
+                    </div>
+                    <small>Farbe anklicken: Mitarbeiter hervorheben</small>
+                </div>
+                <div class="vacation-employee-key-list" role="list" aria-label="Farben der Mitarbeiter">
+                    <?php foreach ($employees as $employee): ?>
                         <?php
                         $employeeId = (int)$employee['id'];
-                        $employeeVacations = $vacationsByEmployee[$employeeId] ?? [];
+                        $employeeColor = $employeeColorById[$employeeId] ?? '#2F6FED';
                         $searchText = trim((string)$employee['name'] . ' ' . (string)$employee['department'] . ' ' . (string)$employee['personnel_number']);
-                        $colorClass = 'vacation-color-' . (($employeeIndex % 8) + 1);
+                        $hasVacationInYear = !empty($vacationsByEmployee[$employeeId]);
                         ?>
-                        <div class="vacation-timeline-row <?= h($colorClass) ?>" data-employee-row data-has-vacation="<?= $employeeVacations ? '1' : '0' ?>" data-search="<?= h($searchText) ?>">
-                            <div class="calendar-employee-column">
-                                <span class="calendar-employee-avatar"><?= h($employeeInitials((string)$employee['name'])) ?></span>
-                                <span class="calendar-employee-copy">
-                                    <strong><?= h((string)$employee['name']) ?></strong>
-                                    <small><?= h((string)($employee['department'] ?: 'Ohne Abteilung')) ?></small>
-                                </span>
-                            </div>
-                            <div class="calendar-days-grid calendar-row-grid">
-                                <?php foreach ($dayDates as $dayInfo): ?>
-                                    <?php
-                                    $classes = ['calendar-day-cell'];
-                                    if ($dayInfo['weekday'] >= 6) $classes[] = 'is-weekend';
-                                    if ($dayInfo['holiday'] !== '') $classes[] = 'is-holiday';
-                                    if ($dayInfo['today']) $classes[] = 'is-today';
-                                    ?>
-                                    <span class="<?= h(implode(' ', $classes)) ?>" title="<?= h($dayInfo['holiday']) ?>"></span>
-                                <?php endforeach; ?>
-
-                                <?php foreach ($employeeVacations as $vacation): ?>
-                                    <?php
-                                    $clipStart = max((string)$vacation['start_date'], $monthStart);
-                                    $clipEnd = min((string)$vacation['end_date'], $monthEnd);
-                                    $startDay = (int)date('j', strtotime($clipStart));
-                                    $span = (int)((strtotime($clipEnd) - strtotime($clipStart)) / 86400) + 1;
-                                    $portion = (string)($vacation['portion'] ?? 'FULL');
-                                    $barLabel = $periodLabel($vacation);
-                                    $tag = $isAdmin ? 'button' : 'div';
-                                    ?>
-                                    <<?= $tag ?>
-                                        class="vacation-bar<?= $portion !== 'FULL' ? ' is-half is-' . strtolower($portion) : '' ?><?= $isAdmin ? ' vacation-calendar-edit' : '' ?>"
-                                        style="--bar-start: <?= $startDay ?>; --bar-span: <?= $span ?>"
-                                        title="<?= h((string)$employee['name'] . ' · ' . $barLabel) ?>"
-                                        <?php if ($isAdmin): ?>
-                                            type="button"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#vacationEditModal"
-                                            data-absence-id="<?= (int)$vacation['id'] ?>"
-                                            data-employee-name="<?= h((string)$employee['name']) ?>"
-                                            data-start-date="<?= h((string)$vacation['start_date']) ?>"
-                                            data-end-date="<?= h((string)$vacation['end_date']) ?>"
-                                            data-portion="<?= h($portion) ?>"
-                                            data-note="<?= h((string)$vacation['note']) ?>"
-                                        <?php endif; ?>
-                                    >
-                                        <span><?= h($portion === 'FULL' ? $barLabel : ($portionLabels[$portion] ?? $portion)) ?></span>
-                                    </<?= $tag ?>>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
+                        <button
+                            class="vacation-employee-key-item"
+                            type="button"
+                            role="listitem"
+                            style="--employee-color: <?= h($employeeColor) ?>"
+                            data-employee-legend
+                            data-employee-filter="<?= h((string)$employee['name']) ?>"
+                            data-search="<?= h($searchText) ?>"
+                            data-has-vacation="<?= $hasVacationInYear ? '1' : '0' ?>"
+                            title="<?= h((string)$employee['name'] . ' filtern') ?>"
+                        >
+                            <i aria-hidden="true"></i>
+                            <span><?= h((string)$employee['name']) ?></span>
+                        </button>
                     <?php endforeach; ?>
                 </div>
             </div>
-        </div>
+
+            <div class="vacation-year-board-scroll" data-year-matrix>
+                <div class="vacation-year-board">
+                    <?php foreach ($yearMatrixMonths as $monthNumber => $matrixMonth): ?>
+                        <?php
+                        $monthSummary = $matrixMonth['vacation_count'] === 0
+                            ? 'Keine Urlaube'
+                            : $matrixMonth['vacation_count'] . ' ' . ($matrixMonth['vacation_count'] === 1 ? 'Eintrag' : 'Einträge')
+                                . ' · ' . $matrixMonth['employee_count'] . ' ' . ($matrixMonth['employee_count'] === 1 ? 'Person' : 'Personen');
+                        ?>
+                        <section
+                            class="vacation-year-board-month<?= $matrixMonth['is_current'] ? ' is-current' : '' ?>"
+                            data-year-month-row
+                            data-has-vacation="<?= $matrixMonth['vacation_count'] > 0 ? '1' : '0' ?>"
+                            aria-labelledby="vacationYearMonth<?= (int)$monthNumber ?>"
+                        >
+                            <a
+                                class="vacation-year-board-month-label"
+                                href="<?= h(url('/vacation-calendar?view=month&year=' . $year . '&month=' . $monthNumber)) ?>"
+                                title="<?= h($matrixMonth['name'] . ' ' . $year . ' detailliert öffnen') ?>"
+                            >
+                                <span><?= str_pad((string)$monthNumber, 2, '0', STR_PAD_LEFT) ?></span>
+                                <strong id="vacationYearMonth<?= (int)$monthNumber ?>"><?= h($matrixMonth['name']) ?></strong>
+                                <small><?= h($monthSummary) ?></small>
+                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                            </a>
+
+                            <div class="vacation-year-board-grid" style="--track-count: <?= (int)$matrixMonth['track_count'] ?>">
+                                <div class="vacation-year-board-days" aria-hidden="true">
+                                    <?php foreach ($matrixMonth['days'] as $dayInfo): ?>
+                                        <?php if ($dayInfo['outside']): ?>
+                                            <span class="is-outside"></span>
+                                        <?php else: ?>
+                                            <?php
+                                            $classes = [];
+                                            if ($dayInfo['weekday'] >= 6) $classes[] = 'is-weekend';
+                                            if ($dayInfo['holiday'] !== '') $classes[] = 'is-holiday';
+                                            if ($dayInfo['today']) $classes[] = 'is-today';
+                                            ?>
+                                            <span class="<?= h(implode(' ', $classes)) ?>" title="<?= h((string)$dayInfo['holiday']) ?>">
+                                                <small><?= h($weekdayNames[$dayInfo['weekday']]) ?></small>
+                                                <strong><?= (int)$dayInfo['day'] ?></strong>
+                                            </span>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                </div>
+
+                                <div class="vacation-year-board-lanes">
+                                    <div class="vacation-year-board-background" aria-hidden="true">
+                                        <?php foreach ($matrixMonth['days'] as $dayInfo): ?>
+                                            <?php if ($dayInfo['outside']): ?>
+                                                <span class="is-outside"></span>
+                                            <?php else: ?>
+                                                <?php
+                                                $classes = [];
+                                                if ($dayInfo['weekday'] >= 6) $classes[] = 'is-weekend';
+                                                if ($dayInfo['holiday'] !== '') $classes[] = 'is-holiday';
+                                                if ($dayInfo['today']) $classes[] = 'is-today';
+                                                ?>
+                                                <span class="<?= h(implode(' ', $classes)) ?>" title="<?= h((string)$dayInfo['holiday']) ?>"></span>
+                                            <?php endif; ?>
+                                        <?php endforeach; ?>
+                                    </div>
+
+                                    <?php foreach ($matrixMonth['segments'] as $segment): ?>
+                                        <?php
+                                        $vacation = $segment['vacation'];
+                                        $employee = $segment['employee'];
+                                        $portion = $segment['portion'];
+                                        $tag = $isAdmin ? 'button' : 'div';
+                                        ?>
+                                        <<?= $tag ?>
+                                            class="vacation-year-board-bar<?= $portion !== 'FULL' ? ' is-half is-' . strtolower($portion) : '' ?><?= $isAdmin ? ' vacation-calendar-edit' : '' ?>"
+                                            style="--bar-start: <?= (int)$segment['start_day'] ?>; --bar-span: <?= (int)$segment['span'] ?>; --bar-track: <?= (int)$segment['track'] ?>; --employee-color: <?= h((string)$segment['color']) ?>"
+                                            title="<?= h((string)$employee['name'] . ' · ' . (string)$segment['period_label']) ?>"
+                                            data-vacation-entry
+                                            data-search="<?= h((string)$segment['search']) ?>"
+                                            data-employee-id="<?= (int)$segment['employee_id'] ?>"
+                                            <?php if ($isAdmin): ?>
+                                                type="button"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#vacationEditModal"
+                                                data-absence-id="<?= (int)$vacation['id'] ?>"
+                                                data-employee-name="<?= h((string)$employee['name']) ?>"
+                                                data-start-date="<?= h((string)$vacation['start_date']) ?>"
+                                                data-end-date="<?= h((string)$vacation['end_date']) ?>"
+                                                data-portion="<?= h($portion) ?>"
+                                                data-note="<?= h((string)$vacation['note']) ?>"
+                                            <?php else: ?>
+                                                tabindex="0"
+                                            <?php endif; ?>
+                                        >
+                                            <span><?= h((string)$segment['bar_label']) ?></span>
+                                        </<?= $tag ?>>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </section>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        <?php endif; ?>
 
         <div id="vacationCalendarEmpty" class="calendar-filter-empty" hidden>
             <strong>Keine passenden Mitarbeiter gefunden</strong>
@@ -297,7 +579,7 @@ if (!$isAdmin) {
             <?php if ($isAdmin): ?>
                 <div class="request-filter-tabs" role="navigation" aria-label="Antragsstatus filtern">
                     <?php foreach (['PENDING' => 'Offen', 'APPROVED' => 'Genehmigt', 'REJECTED' => 'Abgelehnt', 'ALL' => 'Alle'] as $filter => $label): ?>
-                        <a class="request-filter-tab<?= $requestStatus === $filter ? ' active' : '' ?>" href="<?= h(url('/vacation-calendar?year=' . $year . '&month=' . $month . '&request_status=' . $filter . '#vacationRequests')) ?>"><?= h($label) ?></a>
+                        <a class="request-filter-tab<?= $requestStatus === $filter ? ' active' : '' ?>" href="<?= h(url('/vacation-calendar?view=' . $viewMode . '&year=' . $year . '&month=' . $month . '&request_status=' . $filter . '#vacationRequests')) ?>"><?= h($label) ?></a>
                     <?php endforeach; ?>
                 </div>
             <?php endif; ?>
@@ -358,7 +640,7 @@ if (!$isAdmin) {
         <?php if ($isAdmin && $requestPageCount > 1): ?>
             <nav class="request-pagination" aria-label="Antragsseiten">
                 <?php for ($page = 1; $page <= $requestPageCount; $page++): ?>
-                    <a class="request-page-link<?= $page === $requestPage ? ' active' : '' ?>" href="<?= h(url('/vacation-calendar?year=' . $year . '&month=' . $month . '&request_status=' . $requestStatus . '&requests_page=' . $page . '#vacationRequests')) ?>"><?= (int)$page ?></a>
+                    <a class="request-page-link<?= $page === $requestPage ? ' active' : '' ?>" href="<?= h(url('/vacation-calendar?view=' . $viewMode . '&year=' . $year . '&month=' . $month . '&request_status=' . $requestStatus . '&requests_page=' . $page . '#vacationRequests')) ?>"><?= (int)$page ?></a>
                 <?php endfor; ?>
             </nav>
         <?php endif; ?>

@@ -20,6 +20,7 @@ $navActive = static function (string $path) use ($requestPath): string {
     }
     return str_starts_with($requestPath, $path) ? ' active' : '';
 };
+$isWideVacationPage = str_starts_with($requestPath, '/vacation-calendar');
 ?>
 <!doctype html>
 <html lang="de">
@@ -92,7 +93,7 @@ $navActive = static function (string $path) use ($requestPath): string {
 <?php endif; ?>
 
 <main class="<?= $isLoggedIn ? 'app-main' : 'login-main' ?>">
-    <div class="<?= $isLoggedIn ? 'container-xxl' : 'container-fluid p-0' ?>">
+    <div class="<?= $isLoggedIn ? ($isWideVacationPage ? 'container-fluid vacation-page-container' : 'container-xxl') : 'container-fluid p-0' ?>">
         <?php if ($isLoggedIn): ?>
             <div class="flash-stack" aria-live="polite">
                 <?php foreach ($flash as $message): ?>

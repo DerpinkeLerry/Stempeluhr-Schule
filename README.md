@@ -11,7 +11,7 @@ PHP-Anwendung zur Arbeitszeit-, Pausen-, Abwesenheits- und Urlaubsverwaltung mit
 - aktive und inaktive Beschäftigte ohne Verlust ihrer Historie
 - historisierte Arbeitszeitmodelle pro Wochentag
 - Urlaubskonto pro Kalenderjahr mit Anspruch, Übertrag und Korrektur
-- gemeinsamer Urlaubskalender für alle aktiven Mitarbeiter
+- gemeinsamer Urlaubskalender für alle aktiven Mitarbeiter mit umschaltbarer Monats- und kompakter Jahresansicht
 - dauerhaftes Urlaubsantragsarchiv mit Genehmigung oder Ablehnung durch die Administration
 - automatische Übernahme ungenutzten Jahresurlaubs ins Folgejahr; Nutzung des Übertrags nur bis 31. März
 - serverseitige Sperre bei nicht ausreichendem Urlaubsbestand

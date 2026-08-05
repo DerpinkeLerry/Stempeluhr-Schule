@@ -131,3 +131,27 @@ Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.
 - Direkte Urlaubseinträge, Änderungen und neue Anträge werden serverseitig blockiert, wenn der verfügbare Urlaub nicht ausreicht.
 - Große Benachrichtigungen mit Statussymbol, klarer Überschrift, längerer Sichtbarkeit und Fortschrittsbalken zeigen an, wann eine Meldung automatisch verschwindet. Der Countdown pausiert beim Darüberfahren oder Fokussieren.
 - Datenbankschema auf `PRAGMA user_version = 3` angehoben; vorhandene Version-2-Datenbanken erhalten die neue Antragstabelle ohne Umbau der bestehenden Zeiterfassungstabellen.
+
+## Urlaubskalender – Monats- und Jahresansicht
+
+- Neuer Umschalter **Monat / Jahr** direkt in der Kalenderwerkzeugleiste.
+- Die Monatsansicht bleibt für die detaillierte Tagesplanung erhalten.
+- Die Jahresansicht zeigt alle zwölf Monate nebeneinander und alle aktiven Mitarbeiter untereinander, sodass das komplette Planungsjahr auf breiten Bildschirmen gleichzeitig sichtbar ist.
+- Urlaubszeiträume werden je Mitarbeiter als kompakte farbige Balken dargestellt; genaue Daten erscheinen beim Darüberfahren und können von der Administration weiterhin direkt bearbeitet werden.
+- Monatsüberschriften in der Jahresansicht führen mit einem Klick in die jeweilige detaillierte Monatsansicht.
+- Suche und Filter „Nur mit Urlaub“ funktionieren in beiden Ansichten.
+- Der Urlaubskalender nutzt als einzige Seite die nahezu vollständige Bildschirmbreite; auf kleineren Geräten bleibt die Ansicht kontrolliert horizontal scrollbar.
+- Navigation, Jahresauswahl und Antragsfilter behalten die gewählte Ansicht bei.
+
+## Urlaubskalender: moderne Jahres-Planungstafel (v5)
+
+- Die Jahresansicht ist jetzt die Standardansicht.
+- Monate stehen untereinander; jeder Kalendertag bleibt als eigene Spalte sichtbar.
+- Urlaube werden wie im bewährten alten Jahresplan als farbige Balken dargestellt.
+- Jeder aktive Mitarbeiter erhält eine feste, eindeutige Farbe in Monats- und Jahresansicht.
+- Überschneidende Urlaube werden automatisch auf kompakte Spuren verteilt, damit Balken nicht verdeckt werden.
+- Mitarbeiterfarben können angeklickt werden, um den Jahresplan direkt zu filtern.
+- Monatszeilen zeigen Eintrags- und Mitarbeiteranzahl und öffnen per Klick die Detailansicht.
+- Wochenenden, Feiertage und der aktuelle Tag bleiben klar markiert.
+- Der Jahresplan nutzt die vollständige verfügbare Bildschirmbreite und scrollt nur auf kleineren Bildschirmen horizontal.
+

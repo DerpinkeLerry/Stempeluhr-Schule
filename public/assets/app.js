@@ -704,22 +704,70 @@
         const employeeSearch = document.getElementById('vacationEmployeeSearch');
         const hideFree = document.getElementById('vacationHideFree');
         const employeeRows = Array.from(document.querySelectorAll('[data-employee-row]'));
+        const yearMatrix = vacationCalendarRoot.querySelector('[data-year-matrix]');
+        const yearMonthRows = Array.from(document.querySelectorAll('[data-year-month-row]'));
+        const vacationEntries = Array.from(document.querySelectorAll('[data-vacation-entry]'));
+        const employeeLegendItems = Array.from(document.querySelectorAll('[data-employee-legend]'));
+        const employeeFilterButtons = Array.from(document.querySelectorAll('[data-employee-filter]'));
         const calendarEmpty = document.getElementById('vacationCalendarEmpty');
 
         const filterVacationRows = () => {
             const query = normalizeSearch(employeeSearch?.value || '');
             const onlyWithVacation = Boolean(hideFree?.checked);
+
+            if (yearMatrix) {
+                let visibleMonths = 0;
+                let visibleEntries = 0;
+
+                vacationEntries.forEach(entry => {
+                    const matches = !query || normalizeSearch(entry.dataset.search || '').includes(query);
+                    entry.hidden = !matches;
+                    entry.classList.toggle('is-muted', false);
+                    if (matches) visibleEntries++;
+                });
+
+                yearMonthRows.forEach(row => {
+                    const matchingEntries = Array.from(row.querySelectorAll('[data-vacation-entry]')).filter(entry => !entry.hidden).length;
+                    const hideBecauseSearch = Boolean(query) && matchingEntries === 0;
+                    const hideBecauseEmpty = onlyWithVacation && matchingEntries === 0;
+                    row.hidden = hideBecauseSearch || hideBecauseEmpty;
+                    if (!row.hidden) visibleMonths++;
+                });
+
+                employeeLegendItems.forEach(item => {
+                    const matchesSearch = !query || normalizeSearch(item.dataset.search || '').includes(query);
+                    const matchesVacation = !onlyWithVacation || item.dataset.hasVacation === '1';
+                    item.hidden = !(matchesSearch && matchesVacation);
+                    item.classList.toggle('is-active', Boolean(query) && normalizeSearch(item.dataset.employeeFilter || '') === query);
+                });
+
+                if (calendarEmpty) calendarEmpty.hidden = visibleMonths > 0 && (!query || visibleEntries > 0);
+                return;
+            }
+
             let visible = 0;
             employeeRows.forEach(row => {
-                const matchesSearch = !query || normalizeSearch(row.dataset.search).includes(query);
+                const matchesSearch = !query || normalizeSearch(row.dataset.search || '').includes(query);
                 const matchesVacation = !onlyWithVacation || row.dataset.hasVacation === '1';
                 row.hidden = !(matchesSearch && matchesVacation);
                 if (!row.hidden) visible++;
             });
             if (calendarEmpty) calendarEmpty.hidden = visible > 0;
         };
+
+        employeeFilterButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                if (!employeeSearch) return;
+                const value = button.dataset.employeeFilter || '';
+                employeeSearch.value = normalizeSearch(employeeSearch.value) === normalizeSearch(value) ? '' : value;
+                filterVacationRows();
+                employeeSearch.focus({preventScroll: true});
+            });
+        });
+
         employeeSearch?.addEventListener('input', filterVacationRows);
         hideFree?.addEventListener('change', filterVacationRows);
+        filterVacationRows();
 
         const syncVacationFormDates = form => {
             if (!form?.elements?.start_date || !form?.elements?.end_date || !form?.elements?.portion) return;

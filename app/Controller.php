@@ -188,6 +188,10 @@ final class Controller
         $berlinNow = new DateTimeImmutable('now', new DateTimeZone('Europe/Berlin'));
         $currentYear = (int)$berlinNow->format('Y');
         $currentMonth = (int)$berlinNow->format('n');
+        $viewMode = strtolower((string)($_GET['view'] ?? 'year'));
+        if (!in_array($viewMode, ['month', 'year'], true)) {
+            $viewMode = 'year';
+        }
         $year = (int)($_GET['year'] ?? $currentYear);
         $month = (int)($_GET['month'] ?? $currentMonth);
         if ($year < 1970 || $year > 2200) {
@@ -201,8 +205,10 @@ final class Controller
         $monthEnd = (new DateTimeImmutable($monthStart . ' 00:00:00', new DateTimeZone('UTC')))
             ->modify('last day of this month')
             ->format('Y-m-d');
+        $periodStart = $viewMode === 'year' ? sprintf('%04d-01-01', $year) : $monthStart;
+        $periodEnd = $viewMode === 'year' ? sprintf('%04d-12-31', $year) : $monthEnd;
         $employees = $this->service->listActiveEmployeesForVacationCalendar();
-        $vacations = $this->service->listVacationAbsencesForPeriod($monthStart, $monthEnd);
+        $vacations = $this->service->listVacationAbsencesForPeriod($periodStart, $periodEnd);
         $vacationsByEmployee = [];
         foreach ($vacations as $vacation) {
             $vacationsByEmployee[(int)$vacation['employee_id']][] = $vacation;
@@ -255,10 +261,13 @@ final class Controller
         $this->render('vacation_calendar', compact(
             'isAdmin',
             'currentUserId',
+            'viewMode',
             'year',
             'month',
             'monthStart',
             'monthEnd',
+            'periodStart',
+            'periodEnd',
             'employees',
             'vacations',
             'vacationsByEmployee',

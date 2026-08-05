@@ -296,6 +296,13 @@ textarea {
     padding: clamp(2.3rem, 4vw, 4.25rem) 0 4rem;
 }
 
+.vacation-page-container {
+    width: 100%;
+    max-width: none;
+    padding-right: clamp(1rem, 2.2vw, 2.75rem);
+    padding-left: clamp(1rem, 2.2vw, 2.75rem);
+}
+
 .site-footer {
     padding: 1.15rem 0 1.45rem;
     color: var(--wepro-muted);
@@ -3049,7 +3056,7 @@ textarea {
 
 .vacation-calendar-toolbar {
     display: grid;
-    grid-template-columns: auto minmax(320px, .65fr) minmax(300px, 1fr);
+    grid-template-columns: auto auto minmax(270px, .65fr) minmax(300px, 1fr);
     align-items: center;
     gap: 1rem;
     padding: 1.25rem 1.4rem;
@@ -3119,6 +3126,56 @@ textarea {
     gap: .55rem;
 }
 
+.vacation-calendar-jump.is-year-view {
+    grid-template-columns: 112px auto;
+}
+
+.vacation-view-switch {
+    display: inline-grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 3px;
+    min-width: 178px;
+    padding: 3px;
+    border: 1px solid var(--wepro-line);
+    border-radius: 13px;
+    background: var(--wepro-paper);
+}
+
+.vacation-view-switch a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .38rem;
+    min-height: 36px;
+    padding: .45rem .7rem;
+    border-radius: 9px;
+    color: var(--wepro-muted);
+    font-size: .68rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: color var(--wepro-transition), background var(--wepro-transition), box-shadow var(--wepro-transition);
+}
+
+.vacation-view-switch a:hover {
+    color: var(--wepro-navy);
+}
+
+.vacation-view-switch a.active {
+    background: #fff;
+    color: var(--wepro-navy);
+    box-shadow: 0 5px 14px rgba(21, 37, 65, .1);
+}
+
+.vacation-view-switch svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 .vacation-calendar-tools {
     display: flex;
     align-items: center;
@@ -3173,9 +3230,19 @@ textarea {
     background: var(--wepro-orange);
 }
 
+.legend-vacation {
+    background: linear-gradient(90deg, #2F6FED 0 33%, #1C9A72 33% 66%, #8B5CF6 66%);
+}
+
 .legend-weekend { background: #edf0f4; }
 .legend-holiday { background: repeating-linear-gradient(135deg, #f8dce1 0 4px, #fff 4px 8px); }
 .legend-edit { border: 1px dashed var(--wepro-navy-3); background: #fff; }
+
+.year-view-hint {
+    margin-left: auto;
+    color: var(--wepro-navy-3);
+    font-weight: 500;
+}
 
 .vacation-timeline-scroll {
     overflow-x: auto;
@@ -3406,6 +3473,379 @@ button.vacation-bar:focus-visible {
 .vacation-color-6 { --row-vacation-color: #567b35; }
 .vacation-color-7 { --row-vacation-color: #297e8e; }
 .vacation-color-8 { --row-vacation-color: #7b6a45; }
+
+/* Full-year planning board: months vertically, days horizontally */
+.vacation-employee-key {
+    display: grid;
+    grid-template-columns: minmax(205px, auto) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: center;
+    padding: .9rem 1.4rem;
+    border-bottom: 1px solid var(--wepro-line);
+    background: #fff;
+}
+
+.vacation-employee-key-heading {
+    display: grid;
+    gap: .1rem;
+    min-width: 0;
+}
+
+.vacation-employee-key-heading > div {
+    display: grid;
+    gap: .08rem;
+}
+
+.vacation-employee-key-heading strong {
+    color: var(--wepro-navy);
+    font-size: .7rem;
+}
+
+.vacation-employee-key-heading span,
+.vacation-employee-key-heading small {
+    color: var(--wepro-muted);
+    font-size: .56rem;
+}
+
+.vacation-employee-key-heading small {
+    display: none;
+}
+
+.vacation-employee-key-list {
+    display: flex;
+    gap: .45rem;
+    min-width: 0;
+    padding: .15rem 0 .25rem;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--wepro-line-strong) transparent;
+}
+
+.vacation-employee-key-item {
+    display: inline-flex;
+    align-items: center;
+    gap: .38rem;
+    min-width: max-content;
+    min-height: 30px;
+    padding: .35rem .6rem;
+    border: 1px solid var(--wepro-line);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--wepro-navy-2);
+    font-size: .58rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    transition: border-color var(--wepro-transition), background var(--wepro-transition), box-shadow var(--wepro-transition), transform var(--wepro-transition), opacity var(--wepro-transition);
+}
+
+.vacation-employee-key-item i {
+    width: 9px;
+    height: 9px;
+    flex: 0 0 auto;
+    border-radius: 3px;
+    background: var(--employee-color);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--employee-color) 13%, transparent);
+}
+
+.vacation-employee-key-item:hover,
+.vacation-employee-key-item.is-active {
+    border-color: color-mix(in srgb, var(--employee-color) 50%, var(--wepro-line));
+    background: color-mix(in srgb, var(--employee-color) 8%, #fff);
+    box-shadow: 0 7px 18px color-mix(in srgb, var(--employee-color) 15%, transparent);
+    transform: translateY(-1px);
+}
+
+.vacation-employee-key-item.is-muted {
+    opacity: .28;
+}
+
+.vacation-year-board-scroll {
+    width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-color: var(--wepro-line-strong) transparent;
+}
+
+.vacation-year-board {
+    min-width: 1420px;
+    background: #fff;
+}
+
+.vacation-year-board-month {
+    --month-label-width: 148px;
+    display: grid;
+    grid-template-columns: var(--month-label-width) minmax(0, 1fr);
+    border-bottom: 1px solid var(--wepro-line-strong);
+    background: #fff;
+}
+
+.vacation-year-board-month:last-child {
+    border-bottom: 0;
+}
+
+.vacation-year-board-month:hover {
+    background: #fcfdff;
+}
+
+.vacation-year-board-month.is-current {
+    box-shadow: inset 4px 0 var(--wepro-orange);
+}
+
+.vacation-year-board-month-label {
+    position: sticky;
+    left: 0;
+    z-index: 7;
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) 18px;
+    grid-template-rows: auto auto;
+    align-content: center;
+    column-gap: .55rem;
+    min-width: 0;
+    padding: 1rem .85rem;
+    border-right: 1px solid var(--wepro-line-strong);
+    background: linear-gradient(90deg, #fff 88%, rgba(255, 255, 255, .92));
+    color: inherit;
+    text-decoration: none;
+    transition: background var(--wepro-transition), color var(--wepro-transition);
+}
+
+.vacation-year-board-month-label:hover {
+    background: var(--wepro-orange-soft);
+}
+
+.vacation-year-board-month-label > span {
+    grid-row: 1 / 3;
+    display: grid;
+    place-items: center;
+    align-self: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    background: var(--wepro-paper);
+    color: var(--wepro-muted);
+    font-size: .58rem;
+    font-weight: 800;
+}
+
+.vacation-year-board-month.is-current .vacation-year-board-month-label > span {
+    background: var(--wepro-orange);
+    color: var(--wepro-navy);
+}
+
+.vacation-year-board-month-label strong {
+    align-self: end;
+    overflow: hidden;
+    color: var(--wepro-navy);
+    font-size: .75rem;
+    line-height: 1.15;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vacation-year-board-month-label small {
+    align-self: start;
+    overflow: hidden;
+    color: var(--wepro-muted);
+    font-size: .52rem;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vacation-year-board-month-label svg {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    align-self: center;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: var(--wepro-muted);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform var(--wepro-transition), stroke var(--wepro-transition);
+}
+
+.vacation-year-board-month-label:hover svg {
+    stroke: var(--wepro-navy);
+    transform: translateX(2px);
+}
+
+.vacation-year-board-grid {
+    min-width: 0;
+}
+
+.vacation-year-board-days,
+.vacation-year-board-background,
+.vacation-year-board-lanes {
+    display: grid;
+    grid-template-columns: repeat(31, minmax(38px, 1fr));
+}
+
+.vacation-year-board-days {
+    position: relative;
+    z-index: 3;
+    min-height: 38px;
+    border-bottom: 1px solid var(--wepro-line);
+    background: #fff;
+}
+
+.vacation-year-board-days > span {
+    display: grid;
+    place-content: center;
+    gap: 0;
+    min-width: 0;
+    border-right: 1px solid rgba(218, 225, 233, .88);
+    color: var(--wepro-muted);
+    line-height: 1.05;
+    text-align: center;
+}
+
+.vacation-year-board-days > span:last-child {
+    border-right: 0;
+}
+
+.vacation-year-board-days small {
+    font-size: .48rem;
+    font-weight: 600;
+}
+
+.vacation-year-board-days strong {
+    color: var(--wepro-navy-2);
+    font-size: .64rem;
+}
+
+.vacation-year-board-days .is-weekend,
+.vacation-year-board-background .is-weekend {
+    background: #f1f4f7;
+}
+
+.vacation-year-board-days .is-holiday,
+.vacation-year-board-background .is-holiday {
+    background: repeating-linear-gradient(135deg, #fff0f2 0 5px, #fff 5px 10px);
+}
+
+.vacation-year-board-days .is-holiday strong {
+    color: var(--wepro-danger);
+}
+
+.vacation-year-board-days .is-today,
+.vacation-year-board-background .is-today {
+    box-shadow: inset 2px 0 var(--wepro-orange), inset -2px 0 var(--wepro-orange);
+}
+
+.vacation-year-board-days .is-today strong {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    margin: 0 auto;
+    border-radius: 50%;
+    background: var(--wepro-orange);
+    color: var(--wepro-navy);
+}
+
+.vacation-year-board-days .is-outside,
+.vacation-year-board-background .is-outside {
+    background: #fafbfc;
+    opacity: .72;
+}
+
+.vacation-year-board-lanes {
+    position: relative;
+    grid-template-rows: repeat(var(--track-count), 21px);
+    align-items: stretch;
+    min-height: calc((var(--track-count) * 21px) + 14px);
+    padding: 7px 0;
+    overflow: hidden;
+}
+
+.vacation-year-board-background {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.vacation-year-board-background > span {
+    min-width: 0;
+    border-right: 1px solid rgba(218, 225, 233, .62);
+}
+
+.vacation-year-board-background > span:last-child {
+    border-right: 0;
+}
+
+.vacation-year-board-bar {
+    --bar-start: 1;
+    --bar-span: 1;
+    --bar-track: 1;
+    grid-column: var(--bar-start) / span var(--bar-span);
+    grid-row: var(--bar-track);
+    align-self: center;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    height: 16px;
+    margin: 0 2px;
+    padding: 0 .35rem;
+    overflow: hidden;
+    border: 0;
+    border-radius: 5px;
+    background: var(--employee-color);
+    color: #fff;
+    box-shadow: 0 4px 10px color-mix(in srgb, var(--employee-color) 24%, transparent);
+    font: inherit;
+    font-size: .49rem;
+    font-weight: 800;
+    line-height: 1;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.vacation-year-board-bar span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+button.vacation-year-board-bar,
+div.vacation-year-board-bar[tabindex] {
+    cursor: pointer;
+    transition: filter var(--wepro-transition), transform var(--wepro-transition), box-shadow var(--wepro-transition), opacity var(--wepro-transition);
+}
+
+.vacation-year-board-bar:hover,
+.vacation-year-board-bar:focus-visible {
+    z-index: 6;
+    color: #fff;
+    filter: brightness(1.08) saturate(1.06);
+    outline: 2px solid #fff;
+    outline-offset: 1px;
+    transform: translateY(-1px) scaleY(1.08);
+    box-shadow: 0 8px 17px color-mix(in srgb, var(--employee-color) 35%, transparent);
+}
+
+.vacation-year-board-bar.is-muted {
+    opacity: .12;
+}
+
+.vacation-year-board-bar.is-half {
+    height: 8px;
+    border: 1px solid color-mix(in srgb, var(--employee-color) 72%, #fff);
+    background: repeating-linear-gradient(135deg, var(--employee-color) 0 4px, color-mix(in srgb, var(--employee-color) 72%, #fff) 4px 8px);
+}
+
+.vacation-year-board-bar.is-am {
+    align-self: start;
+    margin-top: 2px;
+}
+
+.vacation-year-board-bar.is-pm {
+    align-self: end;
+    margin-bottom: 2px;
+}
 
 .calendar-filter-empty {
     display: grid;
@@ -3833,6 +4273,14 @@ button.vacation-bar:focus-visible {
         grid-template-columns: 1fr 1fr;
     }
 
+    .vacation-view-switch {
+        justify-self: end;
+    }
+
+    .vacation-calendar-jump {
+        grid-column: 1 / 2;
+    }
+
     .vacation-calendar-tools {
         grid-column: 1 / -1;
         justify-content: space-between;
@@ -3880,8 +4328,18 @@ button.vacation-bar:focus-visible {
         padding: 1rem;
     }
 
+    .vacation-view-switch {
+        width: 100%;
+        justify-self: stretch;
+    }
+
     .vacation-calendar-jump {
         grid-template-columns: 1fr 92px;
+        grid-column: auto;
+    }
+
+    .vacation-calendar-jump.is-year-view {
+        grid-template-columns: 1fr;
     }
 
     .vacation-calendar-jump .btn {
@@ -3909,6 +4367,35 @@ button.vacation-bar:focus-visible {
     .vacation-timeline-header,
     .vacation-timeline-row {
         grid-template-columns: 190px minmax(0, 1fr);
+    }
+
+    .vacation-employee-key {
+        grid-template-columns: 1fr;
+        gap: .55rem;
+        padding: .8rem 1rem;
+    }
+
+    .vacation-employee-key-heading {
+        grid-template-columns: 1fr auto;
+        align-items: end;
+    }
+
+    .vacation-employee-key-heading small {
+        display: block;
+    }
+
+    .vacation-year-board {
+        min-width: 1300px;
+    }
+
+    .vacation-year-board-month {
+        --month-label-width: 132px;
+    }
+
+    .vacation-year-board-days,
+    .vacation-year-board-background,
+    .vacation-year-board-lanes {
+        grid-template-columns: repeat(31, minmax(36px, 1fr));
     }
 
     .calendar-days-grid {
