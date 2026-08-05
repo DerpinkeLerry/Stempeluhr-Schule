@@ -259,7 +259,10 @@ foreach ($monthNames as $monthNumber => $monthName) {
             <span><i class="legend-swatch legend-vacation"></i> Genehmigter Urlaub</span>
             <span><i class="legend-swatch legend-weekend"></i> Wochenende</span>
             <span><i class="legend-swatch legend-holiday"></i> Feiertag</span>
-            <?php if ($isAdmin): ?><span><i class="legend-swatch legend-edit"></i> Urlaub anklicken zum Bearbeiten</span><?php endif; ?>
+            <?php if ($isAdmin): ?>
+                <span><i class="legend-swatch legend-select"></i> Freie Tage anklicken oder zum Markieren ziehen</span>
+                <span><i class="legend-swatch legend-edit"></i> Urlaub anklicken zum Bearbeiten</span>
+            <?php endif; ?>
             <span class="year-view-hint">Mitarbeiterfarbe anklicken, um gezielt zu filtern.</span>
         </div>
 
@@ -339,7 +342,10 @@ foreach ($monthNames as $monthNumber => $monthName) {
                             </div>
 
                             <div class="vacation-year-board-lanes">
-                                <div class="vacation-year-board-background" aria-hidden="true">
+                                <div
+                                    class="vacation-year-board-background<?= $isAdmin ? ' is-admin-selectable' : '' ?>"
+                                    <?= $isAdmin ? 'data-vacation-selection-layer' : 'aria-hidden="true"' ?>
+                                >
                                     <?php foreach ($matrixMonth['days'] as $dayInfo): ?>
                                         <?php if ($dayInfo['outside']): ?>
                                             <span class="is-outside"></span>
@@ -349,8 +355,26 @@ foreach ($monthNames as $monthNumber => $monthName) {
                                             if ($dayInfo['weekday'] >= 6) $classes[] = 'is-weekend';
                                             if ($dayInfo['holiday'] !== '') $classes[] = 'is-holiday';
                                             if ($dayInfo['today']) $classes[] = 'is-today';
+                                            $isSelectableWorkday = $dayInfo['weekday'] < 6 && $dayInfo['holiday'] === '';
+                                            $selectionTitle = $dayInfo['holiday'] !== ''
+                                                ? (string)$dayInfo['holiday'] . ' – wird nicht als Urlaubstag gezählt'
+                                                : ($dayInfo['weekday'] >= 6
+                                                    ? 'Wochenende – wird nicht als Urlaubstag gezählt'
+                                                    : 'Urlaub ab ' . date('d.m.Y', strtotime((string)$dayInfo['date'])) . ' auswählen');
                                             ?>
-                                            <span class="<?= h(implode(' ', $classes)) ?>" title="<?= h((string)$dayInfo['holiday']) ?>"></span>
+                                            <?php if ($isAdmin): ?>
+                                                <button
+                                                    class="vacation-year-board-day-select <?= h(implode(' ', $classes)) ?>"
+                                                    type="button"
+                                                    data-vacation-select-date="<?= h((string)$dayInfo['date']) ?>"
+                                                    data-selectable-workday="<?= $isSelectableWorkday ? '1' : '0' ?>"
+                                                    aria-label="<?= h($selectionTitle) ?>"
+                                                    aria-disabled="<?= $isSelectableWorkday ? 'false' : 'true' ?>"
+                                                    title="<?= h($selectionTitle) ?>"
+                                                ></button>
+                                            <?php else: ?>
+                                                <span class="<?= h(implode(' ', $classes)) ?>" title="<?= h((string)$dayInfo['holiday']) ?>"></span>
+                                            <?php endif; ?>
                                         <?php endif; ?>
                                     <?php endforeach; ?>
                                 </div>
@@ -580,6 +604,15 @@ foreach ($monthNames as $monthNumber => $monthName) {
             </div>
             <form id="vacationCalendarCreateForm">
                 <div class="modal-body">
+                    <div id="vacationCalendarSelectionSummary" class="vacation-selection-summary" hidden>
+                        <span class="vacation-selection-summary-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z"/><path d="m8 15 2 2 5-5"/></svg>
+                        </span>
+                        <span>
+                            <strong>Im Kalender ausgewählt</strong>
+                            <small id="vacationCalendarSelectionText"></small>
+                        </span>
+                    </div>
                     <div class="mb-3">
                         <label class="form-label" for="vacationCreateEmployee">Mitarbeiter</label>
                         <select class="form-select" id="vacationCreateEmployee" name="employeeId" required>

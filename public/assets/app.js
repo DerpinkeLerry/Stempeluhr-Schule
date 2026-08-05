@@ -783,6 +783,191 @@
         });
 
         const createForm = document.getElementById('vacationCalendarCreateForm');
+        const createModalElement = document.getElementById('vacationCreateModal');
+        const selectionSummary = document.getElementById('vacationCalendarSelectionSummary');
+        const selectionSummaryText = document.getElementById('vacationCalendarSelectionText');
+        const selectionCells = Array.from(vacationCalendarRoot.querySelectorAll('[data-vacation-select-date]'));
+        let activeCalendarSelection = null;
+        let selectedCalendarRange = null;
+
+        const formatCalendarDate = value => {
+            const parts = String(value || '').split('-').map(Number);
+            if (parts.length !== 3 || parts.some(part => !Number.isFinite(part))) return value || '';
+            return new Intl.DateTimeFormat('de-DE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            }).format(new Date(Date.UTC(parts[0], parts[1] - 1, parts[2])));
+        };
+
+        const selectionBounds = (firstDate, secondDate) => {
+            const rawStart = firstDate <= secondDate ? firstDate : secondDate;
+            const rawEnd = firstDate <= secondDate ? secondDate : firstDate;
+            const workdayCells = selectionCells.filter(cell => {
+                const date = cell.dataset.vacationSelectDate || '';
+                return cell.dataset.selectableWorkday === '1' && date >= rawStart && date <= rawEnd;
+            });
+
+            if (!workdayCells.length) return null;
+            return {
+                rawStart,
+                rawEnd,
+                start: workdayCells[0].dataset.vacationSelectDate,
+                end: workdayCells[workdayCells.length - 1].dataset.vacationSelectDate,
+                workdays: workdayCells.length
+            };
+        };
+
+        const renderCalendarSelection = (firstDate, secondDate, anchorDate = '') => {
+            const bounds = selectionBounds(firstDate, secondDate);
+            selectionCells.forEach(cell => {
+                const date = cell.dataset.vacationSelectDate || '';
+                const inRawRange = bounds && date >= bounds.rawStart && date <= bounds.rawEnd;
+                const isWorkday = cell.dataset.selectableWorkday === '1';
+                cell.classList.toggle('is-range-selected', Boolean(inRawRange && isWorkday));
+                cell.classList.toggle('is-range-gap', Boolean(inRawRange && !isWorkday));
+                cell.classList.toggle('is-range-start', Boolean(bounds && date === bounds.start));
+                cell.classList.toggle('is-range-end', Boolean(bounds && date === bounds.end));
+                cell.classList.toggle('is-range-anchor', Boolean(inRawRange && date === anchorDate));
+            });
+            return bounds;
+        };
+
+        const clearCalendarSelection = () => {
+            selectionCells.forEach(cell => {
+                cell.classList.remove('is-range-selected', 'is-range-gap', 'is-range-start', 'is-range-end', 'is-range-anchor');
+            });
+            document.body.classList.remove('vacation-range-selecting');
+            activeCalendarSelection = null;
+        };
+
+        const resolveSelectionCellAtPoint = (clientX, clientY) => {
+            const element = document.elementFromPoint(clientX, clientY);
+            const directCell = element?.closest?.('[data-vacation-select-date]');
+            if (directCell && vacationCalendarRoot.contains(directCell)) return directCell;
+
+            const grid = element?.closest?.('.vacation-year-board-grid');
+            if (!grid || !vacationCalendarRoot.contains(grid)) return null;
+            const rect = grid.getBoundingClientRect();
+            if (clientX < rect.left || clientX > rect.right || rect.width <= 0) return null;
+            const dayIndex = Math.max(0, Math.min(30, Math.floor(((clientX - rect.left) / rect.width) * 31)));
+            return grid.querySelectorAll('[data-vacation-select-date]')[dayIndex] || null;
+        };
+
+        const updateSelectionSummary = bounds => {
+            if (selectionSummary && selectionSummaryText) {
+                const dayLabel = bounds.workdays === 1 ? '1 markierter Werktag' : `${bounds.workdays} markierte Werktage`;
+                selectionSummaryText.textContent = `${formatCalendarDate(bounds.start)} – ${formatCalendarDate(bounds.end)} · ${dayLabel}`;
+                selectionSummary.hidden = false;
+            }
+        };
+
+        const openCreateModalForSelection = bounds => {
+            if (!createForm || !createModalElement || !bounds) return;
+            createForm.elements.start_date.value = bounds.start;
+            createForm.elements.end_date.value = bounds.end;
+            createForm.elements.portion.value = 'FULL';
+            syncVacationFormDates(createForm);
+            selectedCalendarRange = bounds;
+            updateSelectionSummary(bounds);
+
+            window.bootstrap?.Modal?.getOrCreateInstance(createModalElement)?.show();
+        };
+
+        if (createForm && createModalElement && selectionCells.length) {
+            vacationCalendarRoot.addEventListener('pointerdown', event => {
+                const cell = event.target.closest('[data-vacation-select-date]');
+                if (!cell || cell.dataset.selectableWorkday !== '1' || event.button !== 0) return;
+
+                event.preventDefault();
+                const date = cell.dataset.vacationSelectDate || '';
+                activeCalendarSelection = {
+                    pointerId: event.pointerId,
+                    startDate: date,
+                    currentDate: date
+                };
+                selectedCalendarRange = null;
+                document.body.classList.add('vacation-range-selecting');
+                renderCalendarSelection(date, date, date);
+                try {
+                    cell.setPointerCapture(event.pointerId);
+                } catch (_) {
+                    // Pointer capture is optional; document listeners still keep the drag active.
+                }
+            });
+
+            document.addEventListener('pointermove', event => {
+                if (!activeCalendarSelection || event.pointerId !== activeCalendarSelection.pointerId) return;
+                if (event.cancelable) event.preventDefault();
+                const cell = resolveSelectionCellAtPoint(event.clientX, event.clientY);
+                if (!cell) return;
+                const date = cell.dataset.vacationSelectDate || '';
+                if (!date || date === activeCalendarSelection.currentDate) return;
+                activeCalendarSelection.currentDate = date;
+                renderCalendarSelection(activeCalendarSelection.startDate, date, date);
+            }, {passive: false});
+
+            document.addEventListener('pointerup', event => {
+                if (!activeCalendarSelection || event.pointerId !== activeCalendarSelection.pointerId) return;
+                const selection = activeCalendarSelection;
+                activeCalendarSelection = null;
+                document.body.classList.remove('vacation-range-selecting');
+                const bounds = renderCalendarSelection(selection.startDate, selection.currentDate, '');
+                if (!bounds) {
+                    clearCalendarSelection();
+                    return;
+                }
+                openCreateModalForSelection(bounds);
+            });
+
+            document.addEventListener('pointercancel', event => {
+                if (!activeCalendarSelection || event.pointerId !== activeCalendarSelection.pointerId) return;
+                clearCalendarSelection();
+            });
+
+            document.addEventListener('keydown', event => {
+                if (event.key !== 'Escape' || !activeCalendarSelection) return;
+                clearCalendarSelection();
+            });
+
+            createModalElement.addEventListener('show.bs.modal', () => {
+                if (selectedCalendarRange || !selectionSummary) return;
+                selectionSummary.hidden = true;
+                if (selectionSummaryText) selectionSummaryText.textContent = '';
+            });
+
+            createModalElement.addEventListener('shown.bs.modal', () => {
+                createForm.elements.employeeId?.focus({preventScroll: true});
+            });
+
+            createModalElement.addEventListener('hidden.bs.modal', () => {
+                selectedCalendarRange = null;
+                clearCalendarSelection();
+                if (selectionSummary) selectionSummary.hidden = true;
+                if (selectionSummaryText) selectionSummaryText.textContent = '';
+            });
+
+            ['start_date', 'end_date', 'portion'].forEach(fieldName => {
+                createForm.elements[fieldName]?.addEventListener('change', () => {
+                    if (!selectedCalendarRange) return;
+                    const bounds = selectionBounds(
+                        createForm.elements.start_date.value,
+                        createForm.elements.end_date.value
+                    );
+                    if (!bounds) {
+                        clearCalendarSelection();
+                        if (selectionSummaryText) {
+                            selectionSummaryText.textContent = 'Der gewählte Zeitraum enthält keinen Werktag.';
+                        }
+                        return;
+                    }
+                    selectedCalendarRange = bounds;
+                    renderCalendarSelection(bounds.start, bounds.end, '');
+                    updateSelectionSummary(bounds);
+                });
+            });
+        }
+
         if (createForm) {
             createForm.addEventListener('submit', async event => {
                 event.preventDefault();

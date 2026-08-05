@@ -3187,6 +3187,11 @@ textarea {
 
 .legend-weekend { background: #edf0f4; }
 .legend-holiday { background: repeating-linear-gradient(135deg, #f8dce1 0 4px, #fff 4px 8px); }
+.legend-select {
+    border: 1px solid color-mix(in srgb, var(--wepro-orange-strong) 72%, #fff);
+    background: color-mix(in srgb, var(--wepro-orange) 28%, #fff);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .75);
+}
 .legend-edit { border: 1px dashed var(--wepro-navy-3); background: #fff; }
 
 .year-view-hint {
@@ -3466,9 +3471,96 @@ textarea {
     pointer-events: none;
 }
 
+.vacation-year-board-background.is-admin-selectable {
+    pointer-events: auto;
+}
+
 .vacation-year-board-background > span {
     min-width: 0;
     border-right: 1px solid rgba(218, 225, 233, .62);
+}
+
+.vacation-year-board-day-select {
+    position: relative;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-right: 1px solid rgba(218, 225, 233, .62);
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: crosshair;
+    appearance: none;
+    touch-action: pan-y;
+}
+
+.vacation-year-board-day-select:last-child {
+    border-right: 0;
+}
+
+.vacation-year-board-day-select[data-selectable-workday="0"] {
+    cursor: default;
+}
+
+.vacation-year-board-day-select[data-selectable-workday="1"]:hover {
+    z-index: 2;
+    background: color-mix(in srgb, var(--wepro-orange) 12%, transparent);
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--wepro-orange-strong) 48%, transparent);
+}
+
+.vacation-year-board-day-select.is-range-selected {
+    z-index: 2;
+    background: color-mix(in srgb, var(--wepro-orange) 25%, #fff);
+    box-shadow:
+        inset 0 2px color-mix(in srgb, var(--wepro-orange-strong) 74%, #fff),
+        inset 0 -2px color-mix(in srgb, var(--wepro-orange-strong) 74%, #fff);
+}
+
+.vacation-year-board-day-select.is-range-selected.is-range-start {
+    border-left: 2px solid var(--wepro-orange-strong);
+    border-radius: 7px 0 0 7px;
+}
+
+.vacation-year-board-day-select.is-range-selected.is-range-end {
+    border-right: 2px solid var(--wepro-orange-strong);
+    border-radius: 0 7px 7px 0;
+}
+
+.vacation-year-board-day-select.is-range-selected.is-range-start.is-range-end {
+    border: 2px solid var(--wepro-orange-strong);
+    border-radius: 7px;
+}
+
+.vacation-year-board-day-select.is-range-gap {
+    z-index: 1;
+    background-image: repeating-linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--wepro-orange) 9%, transparent) 0 5px,
+        transparent 5px 10px
+    );
+    box-shadow:
+        inset 0 2px color-mix(in srgb, var(--wepro-orange-strong) 32%, transparent),
+        inset 0 -2px color-mix(in srgb, var(--wepro-orange-strong) 32%, transparent);
+}
+
+.vacation-year-board-day-select.is-range-anchor::after {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    border: 1px dashed color-mix(in srgb, var(--wepro-navy) 52%, #fff);
+    border-radius: 5px;
+    pointer-events: none;
+}
+
+body.vacation-range-selecting {
+    user-select: none;
+}
+
+body.vacation-range-selecting .vacation-year-board-day-select,
+body.vacation-range-selecting .vacation-year-board-lanes {
+    cursor: ew-resize;
 }
 
 .vacation-year-board-background > span:last-child {
@@ -4050,6 +4142,57 @@ div.vacation-year-board-bar[tabindex] {
     border-color: var(--wepro-navy);
     background: var(--wepro-navy);
     color: #fff;
+}
+
+.vacation-selection-summary {
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    margin-bottom: 1rem;
+    padding: .72rem .82rem;
+    border: 1px solid color-mix(in srgb, var(--wepro-orange-strong) 26%, var(--wepro-line));
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--wepro-orange) 9%, #fff);
+}
+
+.vacation-selection-summary[hidden] {
+    display: none;
+}
+
+.vacation-selection-summary-icon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    border-radius: 10px;
+    background: var(--wepro-orange);
+    color: var(--wepro-navy);
+}
+
+.vacation-selection-summary-icon svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.vacation-selection-summary > span:last-child {
+    display: grid;
+    gap: .08rem;
+}
+
+.vacation-selection-summary strong {
+    color: var(--wepro-navy);
+    font-size: .7rem;
+}
+
+.vacation-selection-summary small {
+    color: var(--wepro-muted);
+    font-size: .62rem;
 }
 
 .vacation-balance-warning {

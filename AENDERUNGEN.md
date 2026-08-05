@@ -180,3 +180,11 @@ Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.
 - Im Kalender markierte Feiertage bleiben ebenfalls frei, da sie nicht vom Urlaubskonto abgezogen werden.
 - Ein Urlaubseintrag bleibt trotz mehrerer sichtbarer Teilbalken ein einzelner Datensatz und kann über jeden Teilbalken vollständig bearbeitet werden.
 - Monatsstatistiken zählen weiterhin Urlaubseinträge und nicht die durch Wochenenden entstehenden Teilsegmente.
+
+## Urlaubskalender – direkte Bereichsauswahl
+
+- Administratoren können einen freien Arbeitstag direkt im Jahreskalender anklicken, um den Dialog „Urlaub eintragen“ mit vorausgefülltem Datum zu öffnen.
+- Durch Gedrückthalten und Ziehen lassen sich zusammenhängende Zeiträume auch über mehrere Monate hinweg markieren.
+- Wochenenden und Feiertage werden in der Auswahl sichtbar übersprungen und weder als Start-/Endtag noch als Urlaubstag übernommen.
+- Der Eintragsdialog zeigt den ausgewählten Zeitraum und die Anzahl der enthaltenen Arbeitstage kompakt an.
+- Bestehende Urlaubsbalken bleiben direkt anklickbar und öffnen weiterhin die Bearbeitung, ohne versehentlich eine neue Auswahl zu starten.
