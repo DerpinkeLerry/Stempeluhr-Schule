@@ -217,3 +217,10 @@ Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.
 - Bei zwischenzeitlich direkt geändertem oder gelöschtem Urlaub wird eine veraltete Genehmigung blockiert, damit keine Daten unbeabsichtigt überschrieben werden.
 - Ursprünglicher Zeitraum, Umfang, Notiz, Entscheidung und Bearbeitungszeitpunkt bleiben dauerhaft gespeichert, auch wenn der Urlaub später gelöscht wird.
 - Datenbankschema auf `PRAGMA user_version = 4` angehoben; vorhandene Version-3-Datenbanken werden beim ersten Start automatisch erweitert.
+
+## Version 13 – Eigenes Urlaubskonto für Mitarbeiter sichtbar
+
+- Mitarbeiter sehen im Urlaubskalender jetzt ihr eigenes Urlaubskonto für das gewählte Jahr.
+- Angezeigt werden Anspruch, Resturlaub-Übertrag, genommene und noch verfügbare Tage.
+- Urlaubskonten anderer Mitarbeiter bleiben weiterhin ausschließlich für Administratoren sichtbar.
+- Die Mitarbeiteransicht ist rein lesend; administrative Kontobearbeitung bleibt geschützt.

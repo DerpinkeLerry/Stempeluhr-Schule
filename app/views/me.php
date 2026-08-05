@@ -59,7 +59,7 @@ foreach ($parts as $part) {
                 <div id="meActions" class="action-grid"><?= $this->renderActionButtons((int)$employee['id'], $status) ?></div>
                 <div class="clock-hint">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
-                    Arbeitsbeginn ist frühestens ab 07:30 Uhr möglich. Während einer Pause bleibt die Arbeitszeit stehen.
+                    Arbeitsbeginn ist frühestens ab 07:30 Uhr möglich.
                 </div>
             </section>
         </div>

@@ -248,6 +248,7 @@ final class Controller
 
         $this->render('vacation_calendar', compact(
             'isAdmin',
+            'currentUserId',
             'year',
             'periodStart',
             'periodEnd',

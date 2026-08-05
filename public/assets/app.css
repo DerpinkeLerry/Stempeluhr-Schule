@@ -3670,6 +3670,25 @@ div.vacation-year-board-bar[tabindex] {
     background: linear-gradient(180deg, #fff 0, #f8fafc 100%);
 }
 
+.vacation-accounts-card-own {
+    max-width: 1080px;
+}
+
+.vacation-accounts-card-own .vacation-account-table-shell {
+    max-height: none;
+}
+
+.vacation-accounts-card-own .vacation-account-table {
+    min-width: 760px;
+}
+
+.vacation-accounts-card-own .vacation-account-table th:first-child { width: 30%; }
+.vacation-accounts-card-own .vacation-account-table th:nth-child(2) { width: 14%; }
+.vacation-accounts-card-own .vacation-account-table th:nth-child(3) { width: 15%; }
+.vacation-accounts-card-own .vacation-account-table th:nth-child(4) { width: 14%; }
+.vacation-accounts-card-own .vacation-account-table th:nth-child(5),
+.vacation-accounts-card-own .vacation-account-table th:last-child { width: 27%; }
+
 .vacation-account-heading {
     align-items: center;
     padding: 1rem 1.1rem;

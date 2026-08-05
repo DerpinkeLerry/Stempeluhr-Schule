@@ -192,7 +192,7 @@ foreach ($monthNames as $monthNumber => $monthName) {
         <div>
             <div class="eyebrow">Gemeinsame Planung</div>
             <h1>Urlaubskalender</h1>
-            <p>Genehmigte Urlaube aller aktuell angestellten Mitarbeiter – übersichtlich, modern und ohne sensible Abwesenheitsdaten.</p>
+            <p>Genehmigte Urlaube aller aktuell angestellten Mitarbeiter.</p>
         </div>
         <div class="vacation-hero-actions">
             <?php if ($isAdmin): ?>
@@ -460,29 +460,37 @@ foreach ($monthNames as $monthNumber => $monthName) {
         </div>
     </section>
 
-    <?php if ($isAdmin): ?>
-        <?php
-        $visibleVacationAccountCount = 0;
-        foreach ($employees as $employee) {
-            if (isset($vacationAccounts[(int)$employee['id']])) {
-                $visibleVacationAccountCount++;
-            }
+    <?php
+    $vacationAccountEmployees = $isAdmin
+        ? $employees
+        : (isset($employeeById[$currentUserId]) ? [$employeeById[$currentUserId]] : []);
+    $visibleVacationAccounts = $isAdmin
+        ? $vacationAccounts
+        : ($ownVacationAccount ? [$currentUserId => $ownVacationAccount] : []);
+    $visibleVacationAccountCount = 0;
+    foreach ($vacationAccountEmployees as $employee) {
+        if (isset($visibleVacationAccounts[(int)$employee['id']])) {
+            $visibleVacationAccountCount++;
         }
-        ?>
-        <section class="surface-card vacation-accounts-card">
+    }
+    ?>
+    <?php if ($visibleVacationAccountCount > 0): ?>
+        <section class="surface-card vacation-accounts-card<?= $isAdmin ? '' : ' vacation-accounts-card-own' ?>">
             <div class="section-heading table-heading vacation-account-heading">
                 <div class="vacation-account-title">
                     <span class="vacation-account-title-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-3"/></svg>
                     </span>
                     <div>
-                        <div class="eyebrow">Kontostände <?= (int)$year ?></div>
-                        <h2>Urlaubskonten</h2>
-                        <p>Kompakte Übersicht aller aktiven Mitarbeiter.</p>
+                        <div class="eyebrow"><?= $isAdmin ? 'Kontostände' : 'Kontostand' ?> <?= (int)$year ?></div>
+                        <h2><?= $isAdmin ? 'Urlaubskonten' : 'Mein Urlaubskonto' ?></h2>
+                        <p><?= $isAdmin ? 'Kompakte Übersicht aller aktiven Mitarbeiter.' : 'Anspruch, Übertrag, genommene und noch verfügbare Urlaubstage auf einen Blick.' ?></p>
                     </div>
                 </div>
                 <div class="vacation-account-heading-meta">
-                    <span class="vacation-account-count"><?= (int)$visibleVacationAccountCount ?> Konten</span>
+                    <?php if ($isAdmin): ?>
+                        <span class="vacation-account-count"><?= (int)$visibleVacationAccountCount ?> Konten</span>
+                    <?php endif; ?>
                     <span class="vacation-account-cutoff">Übertrag verfällt am 31.03.<?= (int)$year ?></span>
                 </div>
             </div>
@@ -495,14 +503,14 @@ foreach ($monthNames as $monthNumber => $monthName) {
                         <th class="text-end">Übertrag</th>
                         <th class="text-end">Genommen</th>
                         <th>Verfügbar</th>
-                        <th class="text-end"><span class="visually-hidden">Urlaubskonto öffnen</span></th>
+                        <?php if ($isAdmin): ?><th class="text-end"><span class="visually-hidden">Urlaubskonto öffnen</span></th><?php endif; ?>
                     </tr>
                     </thead>
                     <tbody>
-                    <?php foreach ($employees as $employee): ?>
+                    <?php foreach ($vacationAccountEmployees as $employee): ?>
                         <?php
                         $employeeId = (int)$employee['id'];
-                        $account = $vacationAccounts[$employeeId] ?? null;
+                        $account = $visibleVacationAccounts[$employeeId] ?? null;
                         if (!$account) continue;
 
                         $entitlement = (float)$account['entitlement_days'] + (float)$account['adjustment_days'];
@@ -540,11 +548,13 @@ foreach ($monthNames as $monthNumber => $monthName) {
                                     <span class="account-balance-track" aria-hidden="true"><span></span></span>
                                 </span>
                             </td>
-                            <td class="text-end">
-                                <a class="vacation-account-open" href="<?= h(url('/employee?id=' . $employeeId . '&vacation_year=' . $year . '#vacation-account')) ?>" aria-label="Urlaubskonto von <?= h((string)$employee['name']) ?> öffnen" title="Urlaubskonto öffnen">
-                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
-                                </a>
-                            </td>
+                            <?php if ($isAdmin): ?>
+                                <td class="text-end">
+                                    <a class="vacation-account-open" href="<?= h(url('/employee?id=' . $employeeId . '&vacation_year=' . $year . '#vacation-account')) ?>" aria-label="Urlaubskonto von <?= h((string)$employee['name']) ?> öffnen" title="Urlaubskonto öffnen">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                                    </a>
+                                </td>
+                            <?php endif; ?>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>
