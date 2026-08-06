@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 final class TimeClockService
 {
+    public const DEFAULT_WEEKLY_HOURS = 38.0;
     private const BASE_BREAK_SECONDS = 30 * 60;
+    private const BASE_BREAK_THRESHOLD_MINUTES = 6 * 60;
 
     private $clock;
     private array $workRuleCache = [];
@@ -204,25 +206,28 @@ final class TimeClockService
         return max(0, $grossSeconds - $breakSeconds);
     }
 
-    public static function calculateBreakAllowanceSeconds(DateTimeImmutable $localWorkStart): int
+    public static function calculateBreakAllowanceSeconds(DateTimeImmutable $localWorkStart, ?int $scheduledMinutes = null): int
     {
         $eightOClock = $localWorkStart->setTime(8, 0, 0);
         $earlyStartBonus = max(0, $eightOClock->getTimestamp() - $localWorkStart->getTimestamp());
+        $scheduledMinutes ??= self::fixedTargetMinutesForWeekday((int)$localWorkStart->format('N'));
+        $baseBreak = $scheduledMinutes > self::BASE_BREAK_THRESHOLD_MINUTES ? self::BASE_BREAK_SECONDS : 0;
 
-        if ((int)$localWorkStart->format('N') === 5) {
-            return $earlyStartBonus;
-        }
+        return $baseBreak + $earlyStartBonus;
+    }
 
-        return self::BASE_BREAK_SECONDS + $earlyStartBonus;
+    public static function fixedTargetMinutesForWeekday(int $isoWeekday): int
+    {
+        return match ($isoWeekday) {
+            1, 2, 3, 4 => 510,
+            5 => 240,
+            default => 0,
+        };
     }
 
     public static function calculateAbsenceCreditSeconds(int $isoWeekday): int
     {
-        return match ($isoWeekday) {
-            1, 2, 3, 4 => 8 * 3600 + 30 * 60,
-            5 => 4 * 3600,
-            default => 0,
-        };
+        return self::fixedTargetMinutesForWeekday($isoWeekday) * 60;
     }
 
     public static function absenceRangesAfterWorkedDay(string $startDate, string $endDate, string $workedDay): array
@@ -273,7 +278,8 @@ final class TimeClockService
         float $weeklyHours = 38.0,
         bool $isTrainee = false,
         bool $specialTime = false,
-        float $vacationEntitlement = 30.0
+        float $vacationEntitlement = 30.0,
+        ?array $scheduleHoursByWeekday = null
     ): int {
         $name = trim($name);
         $email = strtolower(trim($email));
@@ -282,6 +288,9 @@ final class TimeClockService
         $phone = trim($phone);
         $role = $role === 'admin' ? 'admin' : 'employee';
         $region = trim($region) !== '' ? trim($region) : (string)cfg('default_holiday_region', 'DE-BY-KF');
+        $scheduleMinutes = $this->normalizeScheduleHours($scheduleHoursByWeekday);
+        $weeklyHours = array_sum($scheduleMinutes) / 60;
+        $specialTime = false;
 
         if ($name === '' || strlen($name) > 100 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new RuntimeException('Name oder E-Mail ist ungültig');
@@ -291,9 +300,6 @@ final class TimeClockService
         }
         if (strlen($password) < 6) {
             throw new RuntimeException('Das Passwort braucht mindestens 6 Zeichen');
-        }
-        if ($weeklyHours < 0 || $weeklyHours > 168) {
-            throw new RuntimeException('Die Wochenstunden sind ungültig');
         }
         if ($vacationEntitlement < 0 || $vacationEntitlement > 365) {
             throw new RuntimeException('Der Urlaubsanspruch ist ungültig');
@@ -328,7 +334,7 @@ final class TimeClockService
                 $now,
             ]);
             $employeeId = (int)$this->pdo->lastInsertId();
-            $this->insertScheduleVersion($employeeId, '1970-01-01', self::defaultScheduleMinutes($weeklyHours), 'web');
+            $this->insertScheduleVersion($employeeId, '1970-01-01', $scheduleMinutes, 'web');
             $year = (int)$this->now()->setTimezone(new DateTimeZone($timezone))->format('Y');
             $this->upsertVacationAccountInternal($employeeId, $year, $vacationEntitlement, 0.0, 0.0, '', 'web');
             $this->pdo->commit();
@@ -376,7 +382,8 @@ final class TimeClockService
         $personnelNumber = trim($personnelNumber);
         $department = trim($department);
         $phone = trim($phone);
-        $weeklyHours ??= (float)$employee['weekly_hours'];
+        $weeklyHours = (float)$employee['weekly_hours'];
+        $specialTime = false;
 
         if ($name === '' || strlen($name) > 100 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new RuntimeException('Name oder E-Mail ist ungültig');
@@ -389,9 +396,6 @@ final class TimeClockService
         }
         if ($password !== '' && strlen($password) < 6) {
             throw new RuntimeException('Das neue Passwort braucht mindestens 6 Zeichen');
-        }
-        if ($weeklyHours < 0 || $weeklyHours > 168) {
-            throw new RuntimeException('Die Wochenstunden sind ungültig');
         }
         try {
             new DateTimeZone($timezone);
@@ -706,9 +710,9 @@ final class TimeClockService
                 'gross_seconds' => 0,
                 'break_seconds' => 0,
                 'net_seconds' => 0,
-                'break_allowance_seconds' => self::BASE_BREAK_SECONDS,
+                'break_allowance_seconds' => 0,
                 'break_bonus_seconds' => 0,
-                'break_remaining_seconds' => self::BASE_BREAK_SECONDS,
+                'break_remaining_seconds' => 0,
             ];
         }
 
@@ -741,10 +745,12 @@ final class TimeClockService
 
         $localNow = $this->now()->setTimezone(new DateTimeZone($employee['timezone']));
         $rule = $this->getWorkRule((int)$localNow->format('N'));
-        $breakAllowanceSeconds = (int)$rule['base_break_minutes'] * 60;
+        $scheduledMinutes = $this->getScheduledMinutesForDate($employeeId, $localNow->format('Y-m-d'));
+        $baseBreakSeconds = $scheduledMinutes > self::BASE_BREAK_THRESHOLD_MINUTES ? self::BASE_BREAK_SECONDS : 0;
+        $breakAllowanceSeconds = $baseBreakSeconds;
         if ($firstTodayStart !== null) {
             $localWorkStart = $this->parseUtc($firstTodayStart)->setTimezone(new DateTimeZone($employee['timezone']));
-            $breakAllowanceSeconds = $this->calculateBreakAllowanceForRule($localWorkStart, $rule);
+            $breakAllowanceSeconds = $this->calculateBreakAllowanceForRule($localWorkStart, $rule, $scheduledMinutes);
         }
 
         return [
@@ -752,7 +758,7 @@ final class TimeClockService
             'break_seconds' => $breakSeconds,
             'net_seconds' => self::calculateNetSeconds($gross, $breakSeconds),
             'break_allowance_seconds' => $breakAllowanceSeconds,
-            'break_bonus_seconds' => max(0, $breakAllowanceSeconds - ((int)$rule['base_break_minutes'] * 60)),
+            'break_bonus_seconds' => max(0, $breakAllowanceSeconds - $baseBreakSeconds),
             'break_remaining_seconds' => $breakAllowanceSeconds - $breakSeconds,
         ];
     }
@@ -850,12 +856,12 @@ final class TimeClockService
                 $byDay[$weekday] = $row;
             }
         }
-        for ($weekday = 1; $weekday <= 7; $weekday++) {
+        foreach (self::defaultScheduleMinutes() as $weekday => $minutes) {
             $byDay[$weekday] ??= [
                 'weekday' => $weekday,
-                'target_minutes' => 0,
-                'planned_start' => '',
-                'planned_end' => '',
+                'target_minutes' => $minutes,
+                'planned_start' => $minutes > 0 ? '08:00' : '',
+                'planned_end' => $this->plannedEndForMinutes($minutes),
                 'valid_from' => $date,
                 'valid_to' => null,
             ];
@@ -873,15 +879,7 @@ final class TimeClockService
             throw new RuntimeException('Das Gültigkeitsdatum ist ungültig');
         }
 
-        $minutesByWeekday = [];
-        for ($weekday = 1; $weekday <= 7; $weekday++) {
-            $hours = isset($hoursByWeekday[$weekday]) ? (float)$hoursByWeekday[$weekday] : 0.0;
-            if ($hours < 0 || $hours > 24) {
-                throw new RuntimeException('Die Sollstunden pro Tag müssen zwischen 0 und 24 liegen');
-            }
-            $minutesByWeekday[$weekday] = (int)round($hours * 60);
-        }
-
+        $minutesByWeekday = $this->normalizeScheduleHours($hoursByWeekday);
         $now = $this->nowUtc();
         $previousDay = (new DateTimeImmutable($effectiveFrom . ' 00:00:00', new DateTimeZone('UTC')))
             ->modify('-1 day')->format('Y-m-d');
@@ -909,6 +907,7 @@ final class TimeClockService
             throw $e;
         }
     }
+
 
     public function getVacationAccount(int $employeeId, int $year, ?string $asOfDate = null): array
     {
@@ -1598,9 +1597,6 @@ final class TimeClockService
                     }
                 }
 
-                if (!in_array($absence['type'], ['VACATION', 'SICK'], true)) {
-                    continue;
-                }
                 if ($absence['credit_minutes_override'] !== null) {
                     $credit = (int)$absence['credit_minutes_override'] * 60;
                 } elseif ($portion === 'FULL') {
@@ -1616,7 +1612,7 @@ final class TimeClockService
 
             $holidayCredit = 0;
             $holidayDay = 0;
-            if (!$hasWorkSession && $absenceType === null && !(int)$employee['special_time'] && $isHoliday) {
+            if (!$hasWorkSession && $absenceType === null && $isHoliday) {
                 $holidayCredit = $plannedSeconds;
                 $holidayDay = $plannedSeconds > 0 ? 1 : 0;
                 $noteParts[] = (string)$holidayRows[$date];
@@ -1731,6 +1727,7 @@ final class TimeClockService
         }
         return (int)$this->getWorkRule($weekday)['default_target_minutes'];
     }
+
 
     private function loadHolidaysForPeriod(string $region, string $startDate, string $endDate): array
     {
@@ -1882,12 +1879,13 @@ final class TimeClockService
         return $localNow->format('H:i') >= (string)$rule['earliest_start'];
     }
 
-    private function calculateBreakAllowanceForRule(DateTimeImmutable $localWorkStart, array $rule): int
+    private function calculateBreakAllowanceForRule(DateTimeImmutable $localWorkStart, array $rule, int $scheduledMinutes): int
     {
         [$hour, $minute] = array_map('intval', explode(':', (string)$rule['break_bonus_until']));
         $bonusUntil = $localWorkStart->setTime($hour, $minute, 0);
         $earlyStartBonus = max(0, $bonusUntil->getTimestamp() - $localWorkStart->getTimestamp());
-        return ((int)$rule['base_break_minutes'] * 60) + $earlyStartBonus;
+        $baseBreak = $scheduledMinutes > self::BASE_BREAK_THRESHOLD_MINUTES ? self::BASE_BREAK_SECONDS : 0;
+        return $baseBreak + $earlyStartBonus;
     }
 
     private function getScheduledMinutesForDate(int $employeeId, string $date): int
@@ -1916,30 +1914,47 @@ final class TimeClockService
         for ($weekday = 1; $weekday <= 7; $weekday++) {
             $minutes = max(0, min(1440, (int)($minutesByWeekday[$weekday] ?? 0)));
             $plannedStart = $minutes > 0 ? '08:00' : '';
-            $plannedEnd = $minutes > 0 ? self::minutesToTime((8 * 60) + $minutes) : '';
+            $plannedEnd = $this->plannedEndForMinutes($minutes);
             $st->execute([$employeeId, $validFrom, $weekday, $minutes, $plannedStart, $plannedEnd, $source, $now, $now]);
         }
     }
 
-    private static function defaultScheduleMinutes(float $weeklyHours): array
+    private function normalizeScheduleHours(?array $hoursByWeekday): array
     {
-        $weeklyMinutes = max(0, (int)round($weeklyHours * 60));
-        if ($weeklyMinutes === 0) {
-            return [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0, 7 => 0];
+        if ($hoursByWeekday === null) {
+            return self::defaultScheduleMinutes();
         }
-        $weights = [1 => 510, 2 => 510, 3 => 510, 4 => 510, 5 => 240];
-        $weightTotal = array_sum($weights);
-        $result = [];
-        $assigned = 0;
-        foreach ($weights as $weekday => $weight) {
-            $minutes = (int)round($weeklyMinutes * ($weight / $weightTotal));
-            $result[$weekday] = $minutes;
-            $assigned += $minutes;
+
+        $minutesByWeekday = [];
+        for ($weekday = 1; $weekday <= 7; $weekday++) {
+            $raw = $hoursByWeekday[$weekday] ?? 0;
+            if ($raw === '' || $raw === null) {
+                $raw = 0;
+            }
+            if (!is_numeric($raw)) {
+                throw new RuntimeException('Die Arbeitszeit pro Tag ist ungültig');
+            }
+            $hours = (float)$raw;
+            if ($hours < 0 || $hours > 24) {
+                throw new RuntimeException('Die Arbeitszeit pro Tag muss zwischen 0 und 24 Stunden liegen');
+            }
+            $minutesByWeekday[$weekday] = (int)round($hours * 60);
         }
-        $result[5] += $weeklyMinutes - $assigned;
-        $result[6] = 0;
-        $result[7] = 0;
-        return $result;
+        return $minutesByWeekday;
+    }
+
+    private static function defaultScheduleMinutes(): array
+    {
+        return [1 => 510, 2 => 510, 3 => 510, 4 => 510, 5 => 240, 6 => 0, 7 => 0];
+    }
+
+    private function plannedEndForMinutes(int $targetMinutes): string
+    {
+        if ($targetMinutes <= 0) {
+            return '';
+        }
+        $baseBreakMinutes = $targetMinutes > self::BASE_BREAK_THRESHOLD_MINUTES ? 30 : 0;
+        return self::minutesToTime((8 * 60) + $targetMinutes + $baseBreakMinutes);
     }
 
     private static function minutesToTime(int $minutesFromMidnight): string
@@ -1947,6 +1962,7 @@ final class TimeClockService
         $minutesFromMidnight = max(0, min(1439, $minutesFromMidnight));
         return sprintf('%02d:%02d', intdiv($minutesFromMidnight, 60), $minutesFromMidnight % 60);
     }
+
 
     private function upsertVacationAccountInternal(
         int $employeeId,
@@ -2422,9 +2438,17 @@ final class TimeClockService
     {
         $tz = new DateTimeZone($timezone);
         $started = $this->parseUtc((string)$work['started_at'])->setTimezone($tz);
-        $rule = $this->getWorkRule((int)$started->format('N'));
-        [$hour, $minute] = array_map('intval', explode(':', (string)$rule['forgotten_end']));
-        $end = $started->setTime($hour, $minute, 0);
+        $date = $started->format('Y-m-d');
+        $targetMinutes = $this->getScheduledMinutesForDate((int)$work['employee_id'], $date);
+        if ($targetMinutes > 0) {
+            $baseBreakMinutes = $targetMinutes > self::BASE_BREAK_THRESHOLD_MINUTES ? 30 : 0;
+            $endMinutes = (8 * 60) + $targetMinutes + $baseBreakMinutes;
+            $end = $started->setTime(intdiv($endMinutes, 60), $endMinutes % 60, 0);
+        } else {
+            $rule = $this->getWorkRule((int)$started->format('N'));
+            [$hour, $minute] = array_map('intval', explode(':', (string)$rule['forgotten_end']));
+            $end = $started->setTime($hour, $minute, 0);
+        }
         if ($end < $started) {
             $end = $started;
         }

@@ -327,12 +327,52 @@ $tests['Halber Urlaub bleibt beim Einstempeln bestehen'] = static function (): v
     assertSameValue(1, (int)$pdo->query('SELECT COUNT(*) FROM absence')->fetchColumn(), 'Ein halber Urlaubstag muss neben echter Arbeitszeit bestehen bleiben');
 };
 
-$tests['Arbeitszeitmodell wird historisiert'] = static function (): void {
-    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-30 10:00:00');
-    $service->updateSchedule($employeeId, '2026-08-01', [1 => 8, 2 => 8, 3 => 8, 4 => 8, 5 => 4, 6 => 0, 7 => 0]);
-    $schedule = $service->getSchedule($employeeId, '2026-08-03');
-    assertSameValue(480, (int)$schedule[1]['target_minutes'], 'Das neue Montags-Soll wurde nicht gespeichert');
-    assertSameValue(36.0, (float)$service->getEmployee($employeeId)['weekly_hours'], 'Die Wochenstunden wurden nicht aktualisiert');
+$tests['Arbeitszeitmodell wird historisiert und für Abwesenheiten verwendet'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-08-10 10:00:00');
+    $service->updateSchedule($employeeId, '2026-08-01', [1 => 7.5, 2 => 0, 3 => 8.5, 4 => 8.5, 5 => 5, 6 => 0, 7 => 0]);
+    $pdo->prepare('INSERT INTO absence(employee_id, type, start_date, end_date, note, source) VALUES(?,?,?,?,?,?)')
+        ->execute([$employeeId, 'SCHOOL', '2026-08-03', '2026-08-03', '', 'test']);
+    $pdo->prepare('INSERT INTO absence(employee_id, type, start_date, end_date, note, source) VALUES(?,?,?,?,?,?)')
+        ->execute([$employeeId, 'OTHER', '2026-08-07', '2026-08-07', '', 'test']);
+
+    $report = $service->buildTimeReport([$employeeId], 'month', '2026-08');
+    $days = [];
+    foreach ($report['employees'][0]['days'] as $day) {
+        $days[$day['date_iso']] = $day;
+    }
+
+    assertSameValue(27000, (int)$days['2026-08-03']['work_seconds'], 'Montag muss mit dem individuellen Plan von 7:30 Stunden gewertet werden');
+    assertSameValue(18000, (int)$days['2026-08-07']['work_seconds'], 'Freitag muss mit dem individuellen Plan von 5:00 Stunden gewertet werden');
+    assertSameValue(0, (int)$days['2026-08-04']['planned_seconds'], 'Ein ausgeschalteter Dienstag muss als freier Tag gelten');
+    assertSameValue('Schule', (string)$days['2026-08-03']['note'], 'Schule muss als anrechenbare Abwesenheit erscheinen');
+    assertSameValue('Sonstiges', (string)$days['2026-08-07']['note'], 'Sonstige Abwesenheit muss als anrechenbare Abwesenheit erscheinen');
+    assertSameValue(29.5, (float)$service->getEmployee($employeeId)['weekly_hours'], 'Die Wochenstunden müssen aus dem Tagesplan berechnet werden');
+};
+
+$tests['Neue Mitarbeiter erhalten den beim Anlegen gewählten Wochenplan'] = static function (): void {
+    [$pdo, $service, &$clock] = newTestContext('2026-08-10 10:00:00');
+    $employeeId = $service->createEmployee(
+        'Teilzeit Person',
+        'teilzeit@example.local',
+        'geheim12',
+        'employee',
+        'Europe/Berlin',
+        'DE-BY-KF',
+        'T-200',
+        '',
+        '',
+        38,
+        false,
+        false,
+        30,
+        [1 => 0, 2 => 6, 3 => 0, 4 => 6, 5 => 4, 6 => 0, 7 => 0]
+    );
+
+    $schedule = $service->getSchedule($employeeId, '2026-08-10');
+    assertSameValue(0, (int)$schedule[1]['target_minutes'], 'Montag muss ausgeschaltet sein');
+    assertSameValue(360, (int)$schedule[2]['target_minutes'], 'Dienstag muss mit 6 Stunden angelegt werden');
+    assertSameValue(240, (int)$schedule[5]['target_minutes'], 'Freitag muss mit 4 Stunden angelegt werden');
+    assertSameValue(16.0, (float)$service->getEmployee($employeeId)['weekly_hours'], 'Die Wochenstunden des neuen Mitarbeiters sind falsch');
 };
 
 $tests['Urlaubskonto zählt halbe Tage'] = static function (): void {

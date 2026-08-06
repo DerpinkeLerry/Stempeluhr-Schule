@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const DATABASE_SCHEMA_VERSION = 4;
+const DATABASE_SCHEMA_VERSION = 6;
 
 function db(): PDO
 {
@@ -49,9 +49,9 @@ function migrate_database(PDO $pdo): void
         && table_has_column($pdo, 'absence', 'portion')
         && table_has_column($pdo, 'public_holiday', 'source');
 
-    // Versions 3 and 4 only extend the persistent vacation-request workflow.
-    // These additions can be applied in place without rebuilding the established
-    // time-tracking tables.
+    // Versions 3 and 4 extend the persistent vacation-request workflow. Versions
+    // 5 and 6 only change application rules around employee schedules and can be
+    // applied in place without rebuilding the established time-tracking tables.
     if ($version >= 2 && $coreSchemaCurrent) {
         migrate_vacation_requests_v4($pdo);
         $pdo->exec('PRAGMA user_version = ' . DATABASE_SCHEMA_VERSION);
@@ -341,9 +341,10 @@ function seed_work_rules(PDO $pdo, string $now): void
     }
 }
 
+
 function seed_employee_structures(PDO $pdo, string $now, bool $createdDemoUsers): void
 {
-    $employees = $pdo->query('SELECT id, personnel_number, email, role, weekly_hours FROM employee')->fetchAll();
+    $employees = $pdo->query('SELECT id, personnel_number, email, role FROM employee')->fetchAll();
     $scheduleInsert = $pdo->prepare('INSERT OR IGNORE INTO employee_schedule(employee_id, valid_from, valid_to, weekday, target_minutes, planned_start, planned_end, source, created_at, updated_at) VALUES(?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)');
     $vacationInsert = $pdo->prepare('INSERT OR IGNORE INTO vacation_account(employee_id, year, entitlement_days, carryover_days, adjustment_days, note, source, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?)');
     $year = (int)date('Y');
@@ -352,9 +353,9 @@ function seed_employee_structures(PDO $pdo, string $now, bool $createdDemoUsers)
         $employeeId = (int)$employee['id'];
         $hasSchedule = (int)$pdo->query('SELECT COUNT(*) FROM employee_schedule WHERE employee_id=' . $employeeId)->fetchColumn() > 0;
         if (!$hasSchedule) {
-            foreach (default_schedule_minutes((float)$employee['weekly_hours']) as $weekday => $minutes) {
+            foreach (standard_schedule_minutes() as $weekday => $minutes) {
                 $plannedStart = $minutes > 0 ? '08:00' : '';
-                $plannedEnd = $minutes > 0 ? minutes_to_time((8 * 60) + $minutes) : '';
+                $plannedEnd = planned_end_for_minutes($minutes);
                 $scheduleInsert->execute([$employeeId, '1970-01-01', $weekday, $minutes, $plannedStart, $plannedEnd, 'system', $now, $now]);
             }
         }
@@ -366,26 +367,18 @@ function seed_employee_structures(PDO $pdo, string $now, bool $createdDemoUsers)
     }
 }
 
-function default_schedule_minutes(float $weeklyHours): array
+function standard_schedule_minutes(): array
 {
-    $weeklyMinutes = max(0, (int)round($weeklyHours * 60));
-    if ($weeklyMinutes === 0) {
-        return [1 => 0, 2 => 0, 3 => 0, 4 => 0, 5 => 0, 6 => 0, 7 => 0];
-    }
+    return [1 => 510, 2 => 510, 3 => 510, 4 => 510, 5 => 240, 6 => 0, 7 => 0];
+}
 
-    $weights = [1 => 510, 2 => 510, 3 => 510, 4 => 510, 5 => 240];
-    $weightTotal = array_sum($weights);
-    $result = [];
-    $assigned = 0;
-    foreach ($weights as $weekday => $weight) {
-        $minutes = (int)round($weeklyMinutes * ($weight / $weightTotal));
-        $result[$weekday] = $minutes;
-        $assigned += $minutes;
+function planned_end_for_minutes(int $targetMinutes): string
+{
+    if ($targetMinutes <= 0) {
+        return '';
     }
-    $result[5] += $weeklyMinutes - $assigned;
-    $result[6] = 0;
-    $result[7] = 0;
-    return $result;
+    $baseBreakMinutes = $targetMinutes > 360 ? 30 : 0;
+    return minutes_to_time((8 * 60) + $targetMinutes + $baseBreakMinutes);
 }
 
 function minutes_to_time(int $minutesFromMidnight): string

@@ -1,6 +1,6 @@
-# Datenstruktur – Schema Version 4
+# Datenstruktur – Schema Version 6
 
-Die Anwendung verwendet SQLite. Die Schema-Version steht in `PRAGMA user_version` und ist aktuell `4`. Beim ersten Start mit einer älteren Projektdatenbank führt `app/db.php` die strukturelle Migration automatisch aus. Vor einem produktiven Update muss trotzdem eine Dateikopie von `data/stempeluhr.sqlite` erstellt werden.
+Die Anwendung verwendet SQLite. Die Schema-Version steht in `PRAGMA user_version` und ist aktuell `6`. Beim ersten Start mit einer älteren Projektdatenbank führt `app/db.php` die strukturelle Migration automatisch aus. Vor einem produktiven Update muss trotzdem eine Dateikopie von `data/stempeluhr.sqlite` erstellt werden.
 
 ## Zentrale Tabellen
 
@@ -11,23 +11,24 @@ Wichtige Felder:
 
 - `personnel_number`: eindeutige Personalnummer
 - `department`, `phone`: weitere Stammdaten
-- `weekly_hours`: aktuelle Wochenstundenzahl als Übersichtswert
-- `is_trainee`, `special_time`: besondere Beschäftigungsmerkmale
+- `weekly_hours`: aus dem aktuell gespeicherten Wochenplan berechnete Gesamtstundenzahl
+- `is_trainee`: Kennzeichnung als Auszubildender
+- `special_time`: technisches Alt-Feld; die Anwendung setzt es fest auf `0`
 - `active`: Beschäftigungsstatus
 - `login_enabled`: Anmeldung an der Stempeluhr erlaubt
 
 Mitarbeiter werden nicht physisch gelöscht. Beim Deaktivieren bleiben Zeiten, Pausen, Abwesenheiten und Urlaubskonten erhalten.
 
 ### `employee_schedule`
-Historisierte Sollarbeitszeit pro Wochentag.
+Historisierte Sollarbeitszeit pro Mitarbeiter und Wochentag.
 
-- `valid_from`, `valid_to`: Gültigkeitszeitraum
+- `valid_from`, `valid_to`: Gültigkeitszeitraum des Modells
 - `weekday`: ISO-Wochentag 1 bis 7
-- `target_minutes`: Sollzeit des Tages
-- `planned_start`, `planned_end`: optionale Planzeiten
+- `target_minutes`: geplante Arbeitszeit des Tages; `0` bedeutet regelmäßig frei
+- `planned_start`, `planned_end`: technische Planzeiten für automatische Korrekturen
 - `source`: Ursprung, zum Beispiel `web` oder `system`
 
-Eine Änderung legt eine neue Version ab. Vergangene Auswertungen behalten dadurch das damals gültige Soll.
+Neue Mitarbeiter erhalten standardmäßig Montag bis Donnerstag `510` Minuten und Freitag `240` Minuten. Änderungen legen ab dem gewählten Datum eine neue Version an. Zeitnachweise, Urlaubstage, Feiertage und Abwesenheitsgutschriften verwenden immer das für das jeweilige Datum gültige Modell.
 
 ### `vacation_account`
 Urlaubskonto eines Mitarbeiters pro Kalenderjahr.
@@ -88,8 +89,10 @@ Allgemeine Regeln pro Wochentag:
 - frühester Arbeitsbeginn
 - Ende des Frühstart-Pausenbonus
 - automatische Endzeit bei vergessenem Feierabend
-- Grundpause
-- Standard-Sollzeit als Rückfallwert
+- technische Grundpause als Rückfallwert
+- Standard-Tageszeit als Rückfallwert, falls für einen Mitarbeiter noch kein Wochenplan existiert
+
+Die tatsächliche Pausengutschrift richtet sich nach der geplanten Tageszeit: Bei mehr als 6 Stunden gelten 30 Minuten Grundpause; die Zeit eines Arbeitsbeginns vor 08:00 Uhr kommt zusätzlich hinzu.
 
 ### `overtime_event`
 Besondere Überstunden- oder Zeitgutschrift-Tage.

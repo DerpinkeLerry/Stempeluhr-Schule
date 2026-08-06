@@ -52,10 +52,8 @@ final class TimeReportPdfRenderer
         );
 
         $this->drawMetricCards($pdf, 35, 126, 525, 48, [
-            ['label' => 'Sollzeit', 'value' => $this->duration((int)$employeeReport['planned_seconds'])],
             ['label' => 'Arbeitszeit', 'value' => $this->duration((int)$employeeReport['work_seconds'])],
             ['label' => 'Pausen', 'value' => $this->duration((int)$employeeReport['break_seconds'])],
-            ['label' => 'Differenz', 'value' => $this->signedDuration((int)$employeeReport['difference_seconds']), 'signed' => true],
         ]);
 
         $left = 35.0;
@@ -121,10 +119,8 @@ final class TimeReportPdfRenderer
         );
 
         $this->drawMetricCards($pdf, 35, 104, 772, 38, [
-            ['label' => 'Sollzeit', 'value' => $this->duration((int)$employeeReport['planned_seconds'])],
             ['label' => 'Arbeitszeit', 'value' => $this->duration((int)$employeeReport['work_seconds'])],
             ['label' => 'Pausen', 'value' => $this->duration((int)$employeeReport['break_seconds'])],
-            ['label' => 'Differenz', 'value' => $this->signedDuration((int)$employeeReport['difference_seconds']), 'signed' => true],
         ], 7.1, 12.0);
 
         $left = 35.0;
@@ -132,8 +128,8 @@ final class TimeReportPdfRenderer
         $headerHeight = 19.0;
         $days = $employeeReport['days'];
         $rowHeight = min(11.65, 362.0 / max(1, count($days)));
-        $widths = [27.0, 49.0, 41.0, 41.0, 45.0, 55.0, 48.0, 52.0, 414.0];
-        $headers = ['Tag', 'Datum', 'Beginn', 'Ende', 'Pause', 'Arbeitszeit', 'Soll', 'Differenz', 'Bemerkung'];
+        $widths = [27.0, 49.0, 45.0, 45.0, 50.0, 62.0, 494.0];
+        $headers = ['Tag', 'Datum', 'Beginn', 'Ende', 'Pause', 'Arbeitszeit', 'Bemerkung'];
         $tableWidth = array_sum($widths);
 
         $pdf->rectColor($left, $top, $tableWidth, $headerHeight, ...self::NAVY);
@@ -152,18 +148,13 @@ final class TimeReportPdfRenderer
                 (string)$day['end'],
                 $this->duration((int)$day['break_seconds']),
                 $this->duration((int)$day['work_seconds']),
-                $this->duration((int)$day['planned_seconds']),
-                $this->signedDuration((int)$day['difference_seconds']),
-                $this->shortText((string)$day['note'], 88),
+                $this->shortText((string)$day['note'], 108),
             ];
             $x = $left;
             $baseline = $top + $headerHeight + ($rowHeight * $rowIndex) + min(8.2, $rowHeight - 2.2);
             foreach ($values as $column => $value) {
-                $color = $column === 7
-                    ? $this->signedColor((int)$day['difference_seconds'])
-                    : self::TEXT;
-                $fontSize = $column === 8 ? 6.1 : 6.25;
-                $pdf->text($x + 3, $baseline, $fontSize, $value === '' ? '-' : $value, false, $color);
+                $fontSize = $column === 6 ? 6.1 : 6.25;
+                $pdf->text($x + 3, $baseline, $fontSize, $value === '' ? '-' : $value, false, self::TEXT);
                 $x += $widths[$column];
             }
         }
@@ -193,18 +184,16 @@ final class TimeReportPdfRenderer
         );
 
         $this->drawMetricCards($pdf, 35, 104, 772, 42, [
-            ['label' => 'Sollzeit im Jahr', 'value' => $this->duration((int)$employeeReport['planned_seconds'])],
             ['label' => 'Arbeitszeit im Jahr', 'value' => $this->duration((int)$employeeReport['work_seconds'])],
             ['label' => 'Pausen im Jahr', 'value' => $this->duration((int)$employeeReport['break_seconds'])],
-            ['label' => 'Jahresdifferenz', 'value' => $this->signedDuration((int)$employeeReport['difference_seconds']), 'signed' => true],
         ], 7.0, 12.0);
 
         $left = 35.0;
         $top = 160.0;
         $headerHeight = 23.0;
         $rowHeight = 27.0;
-        $widths = [92.0, 76.0, 86.0, 68.0, 86.0, 82.0, 82.0, 82.0, 118.0];
-        $headers = ['Monat', 'Sollzeit', 'Arbeitszeit', 'Pausen', 'Differenz', 'Urlaubstage', 'Krankheitstage', 'Feiertage', 'Anwesenheitstage'];
+        $widths = [130.0, 110.0, 90.0, 100.0, 100.0, 100.0, 142.0];
+        $headers = ['Monat', 'Arbeitszeit', 'Pausen', 'Urlaubstage', 'Krankheitstage', 'Feiertage', 'Anwesenheitstage'];
         $months = $employeeReport['months'];
         $tableWidth = array_sum($widths);
 
@@ -213,11 +202,6 @@ final class TimeReportPdfRenderer
             $rowTop = $top + $headerHeight + ($rowHeight * $rowIndex);
             $fill = $rowIndex % 2 === 0 ? self::WHITE : self::PAPER;
             $pdf->rectColor($left, $rowTop, $tableWidth, $rowHeight, ...$fill);
-            if ((int)$month['difference_seconds'] > 0) {
-                $pdf->rectColor($left, $rowTop, 4, $rowHeight, ...self::SUCCESS);
-            } elseif ((int)$month['difference_seconds'] < 0) {
-                $pdf->rectColor($left, $rowTop, 4, $rowHeight, ...self::DANGER);
-            }
         }
         $this->drawGrid($pdf, $left, $top, $widths, $headerHeight, $rowHeight, count($months), 0.45);
         $this->drawHeaders($pdf, $left, $top, $widths, $headers, 6.7, 15.0, true);
@@ -225,10 +209,8 @@ final class TimeReportPdfRenderer
         foreach ($months as $rowIndex => $month) {
             $values = [
                 (string)$month['name'],
-                $this->duration((int)$month['planned_seconds']),
                 $this->duration((int)$month['work_seconds']),
                 $this->duration((int)$month['break_seconds']),
-                $this->signedDuration((int)$month['difference_seconds']),
                 $this->formatDays((float)$month['vacation_days']),
                 $this->formatDays((float)$month['sick_days']),
                 (string)$month['holiday_days'],
@@ -237,13 +219,10 @@ final class TimeReportPdfRenderer
             $x = $left;
             $baseline = $top + $headerHeight + ($rowHeight * $rowIndex) + 17;
             foreach ($values as $column => $value) {
-                $color = $column === 4
-                    ? $this->signedColor((int)$month['difference_seconds'])
-                    : self::TEXT;
                 if ($column === 0) {
                     $pdf->text($x + 8, $baseline, 7.4, $value, true, self::NAVY);
                 } else {
-                    $pdf->textCenter($x, $widths[$column], $baseline, 7.1, $value, false, $color);
+                    $pdf->textCenter($x, $widths[$column], $baseline, 7.1, $value, false, self::TEXT);
                 }
                 $x += $widths[$column];
             }
@@ -288,7 +267,7 @@ final class TimeReportPdfRenderer
         if (!empty($employee['department'])) {
             $meta[] = (string)$employee['department'];
         }
-        if (!empty($employee['weekly_hours'])) {
+        if (isset($employee['weekly_hours'])) {
             $meta[] = number_format((float)$employee['weekly_hours'], 2, ',', '.') . ' Std./Woche';
         }
         $metaLimit = $width > 700 ? 96 : 58;

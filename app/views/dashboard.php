@@ -12,6 +12,8 @@ $reportNow = new DateTimeImmutable('now', new DateTimeZone('Europe/Berlin'));
 $currentReportWeek = sprintf('%04d-W%02d', (int)$week['year'], (int)$week['week']);
 $currentReportMonth = $reportNow->format('Y-m');
 $currentReportYear = $reportNow->format('Y');
+$scheduleDayLabels = [1 => 'Montag', 2 => 'Dienstag', 3 => 'Mittwoch', 4 => 'Donnerstag', 5 => 'Freitag', 6 => 'Samstag', 7 => 'Sonntag'];
+$defaultScheduleHours = [1 => 8.5, 2 => 8.5, 3 => 8.5, 4 => 8.5, 5 => 4.0, 6 => 0.0, 7 => 0.0];
 ?>
 <section class="page-hero dashboard-hero">
     <div class="page-hero-copy">
@@ -58,7 +60,7 @@ $currentReportYear = $reportNow->format('Y');
             <div>
                 <div class="eyebrow">Neuer Zugang</div>
                 <h2>Mitarbeiter anlegen</h2>
-                <p>Persönliche Daten, Rolle und lokale Zeitzone festlegen.</p>
+                <p>Persönliche Daten und den regelmäßigen Wochenplan direkt gemeinsam festlegen.</p>
             </div>
             <button type="button" class="icon-button" data-bs-toggle="collapse" data-bs-target="#newEmployee" aria-label="Formular schließen">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -89,22 +91,18 @@ $currentReportYear = $reportNow->format('Y');
                 <label class="form-label" for="employeePassword">Passwort</label>
                 <input class="form-control" id="employeePassword" name="password" type="password" minlength="6" required autocomplete="new-password" placeholder="Mindestens 6 Zeichen">
             </div>
-            <div class="col-lg-3 col-md-6">
+            <div class="col-lg-4 col-md-6">
                 <label class="form-label" for="employeeRole">Rolle</label>
                 <select class="form-select" id="employeeRole" name="role">
                     <option value="employee">Mitarbeiter</option>
                     <option value="admin">Administration</option>
                 </select>
             </div>
-            <div class="col-lg-3 col-md-6">
-                <label class="form-label" for="employeeWeeklyHours">Wochenstunden</label>
-                <input class="form-control" id="employeeWeeklyHours" name="weekly_hours" type="number" min="0" max="168" step="0.25" value="38">
-            </div>
-            <div class="col-lg-3 col-md-6">
+            <div class="col-lg-4 col-md-6">
                 <label class="form-label" for="employeeVacation">Urlaubsanspruch</label>
                 <input class="form-control" id="employeeVacation" name="vacation_entitlement" type="number" min="0" max="365" step="0.5" value="<?= h((string)cfg('default_vacation_entitlement', 30)) ?>">
             </div>
-            <div class="col-lg-3 col-md-6">
+            <div class="col-lg-4 col-md-6">
                 <label class="form-label" for="employeeTimezone">Zeitzone</label>
                 <select class="form-select" id="employeeTimezone" name="timezone" required>
                     <?php foreach ($timezoneOptions as $group => $options): ?>
@@ -116,9 +114,62 @@ $currentReportYear = $reportNow->format('Y');
                     <?php endforeach; ?>
                 </select>
             </div>
+
+            <div class="col-12">
+                <section class="schedule-planner schedule-planner-create" data-schedule-planner>
+                    <div class="schedule-planner-heading">
+                        <div>
+                            <div class="eyebrow">Arbeitszeiten</div>
+                            <h3>Regelmäßiger Wochenplan</h3>
+                            <p>Arbeitstage lassen sich einzeln aktivieren. Urlaub und Abwesenheiten werden nur an eingeplanten Tagen angerechnet.</p>
+                        </div>
+                        <div class="schedule-total" aria-live="polite">
+                            <span>Wochenzeit</span>
+                            <strong data-schedule-total>38:00 Std.</strong>
+                        </div>
+                    </div>
+                    <div class="schedule-day-cards">
+                        <?php foreach ($scheduleDayLabels as $weekday => $dayLabel): $hours = $defaultScheduleHours[$weekday]; $enabled = $hours > 0; ?>
+                            <article class="schedule-day-card<?= $enabled ? '' : ' is-off' ?>" data-schedule-day>
+                                <div class="schedule-day-card-head">
+                                    <div>
+                                        <strong><?= h($dayLabel) ?></strong>
+                                        <span><?= $enabled ? 'Arbeitstag' : 'Frei' ?></span>
+                                    </div>
+                                    <label class="schedule-day-switch" title="Arbeitstag ein- oder ausschalten">
+                                        <input type="checkbox" data-schedule-toggle<?= $enabled ? ' checked' : '' ?> aria-label="<?= h($dayLabel) ?> als Arbeitstag verwenden">
+                                        <span aria-hidden="true"></span>
+                                    </label>
+                                </div>
+                                <label class="form-label" for="createScheduleDay<?= $weekday ?>">Stunden</label>
+                                <div class="schedule-hours-input">
+                                    <input
+                                        class="form-control"
+                                        id="createScheduleDay<?= $weekday ?>"
+                                        name="schedule_day_<?= $weekday ?>"
+                                        type="number"
+                                        min="0"
+                                        max="24"
+                                        step="0.25"
+                                        value="<?= h(rtrim(rtrim(number_format($hours, 2, '.', ''), '0'), '.')) ?>"
+                                        data-schedule-hours
+                                        data-default-hours="<?= $weekday === 5 ? '4' : '8.5' ?>"
+                                        <?= $enabled ? '' : 'disabled' ?>
+                                    >
+                                    <span>Std.</span>
+                                </div>
+                            </article>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="schedule-planner-note">
+                        <span>Standard: Montag bis Donnerstag 8:30 Std., Freitag 4:00 Std.</span>
+                        <span>Bei mehr als 6 geplanten Stunden: 30 Min. Pause plus Frühstart vor 08:00 Uhr.</span>
+                    </div>
+                </section>
+            </div>
+
             <div class="col-lg-8 d-flex flex-wrap align-items-center gap-4">
                 <div class="form-check"><input class="form-check-input" id="employeeTrainee" name="is_trainee" type="checkbox" value="1"><label class="form-check-label" for="employeeTrainee">Auszubildender</label></div>
-                <div class="form-check"><input class="form-check-input" id="employeeSpecialTime" name="special_time" type="checkbox" value="1"><label class="form-check-label" for="employeeSpecialTime">Sonderarbeitszeit</label></div>
             </div>
             <div class="col-lg-4 d-flex align-items-end">
                 <button class="btn btn-brand w-100" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>Speichern</button>
@@ -203,9 +254,7 @@ $currentReportYear = $reportNow->format('Y');
                                 data-personnel-number="<?= h((string)($employee['personnel_number'] ?? '')) ?>"
                                 data-department="<?= h((string)($employee['department'] ?? '')) ?>"
                                 data-phone="<?= h((string)($employee['phone'] ?? '')) ?>"
-                                data-weekly-hours="<?= h((string)($employee['weekly_hours'] ?? '0')) ?>"
                                 data-is-trainee="<?= (int)($employee['is_trainee'] ?? 0) ?>"
-                                data-special-time="<?= (int)($employee['special_time'] ?? 0) ?>"
                                 data-active="<?= (int)($employee['active'] ?? 0) ?>"
                                 data-login-enabled="<?= (int)($employee['login_enabled'] ?? 0) ?>"
                             >
@@ -249,15 +298,13 @@ $currentReportYear = $reportNow->format('Y');
                         <div class="col-md-6"><label class="form-label">E-Mail</label><input class="form-control" name="email" type="email" required autocomplete="email"></div>
                         <div class="col-md-6"><label class="form-label">Telefon</label><input class="form-control" name="phone" maxlength="50"></div>
                         <div class="col-md-6"><label class="form-label">Abteilung</label><input class="form-control" name="department" maxlength="100"></div>
-                        <div class="col-md-3"><label class="form-label">Wochenstunden</label><input class="form-control" name="weekly_hours" type="number" min="0" max="168" step="0.25"></div>
-                        <div class="col-md-3"><label class="form-label">Rolle</label><select class="form-select" name="role"><option value="employee">Mitarbeiter</option><option value="admin">Administration</option></select></div>
+                        <div class="col-md-6"><label class="form-label">Rolle</label><select class="form-select" name="role"><option value="employee">Mitarbeiter</option><option value="admin">Administration</option></select></div>
                         <div class="col-md-6"><label class="form-label">Neues Passwort</label><input class="form-control" name="password" type="password" minlength="6" autocomplete="new-password" placeholder="Leer lassen, um es beizubehalten"></div>
                         <div class="col-md-6"><label class="form-label">Zeitzone</label><select class="form-select" name="timezone" required>
                             <?php foreach ($timezoneOptions as $group => $options): ?><optgroup label="<?= h($group) ?>"><?php foreach ($options as $option): ?><option value="<?= h($option['value']) ?>"><?= h($option['label']) ?></option><?php endforeach; ?></optgroup><?php endforeach; ?>
                         </select></div>
                         <div class="col-12 d-flex flex-wrap gap-4">
                             <div class="form-check"><input class="form-check-input" name="is_trainee" id="editTrainee" type="checkbox" value="1"><label class="form-check-label" for="editTrainee">Auszubildender</label></div>
-                            <div class="form-check"><input class="form-check-input" name="special_time" id="editSpecial" type="checkbox" value="1"><label class="form-check-label" for="editSpecial">Sonderarbeitszeit</label></div>
                             <div class="form-check"><input class="form-check-input" name="active" id="editActive" type="checkbox" value="1"><label class="form-check-label" for="editActive">Aktiv beschäftigt</label></div>
                             <div class="form-check"><input class="form-check-input" name="login_enabled" id="editLogin" type="checkbox" value="1"><label class="form-check-label" for="editLogin">Anmeldung erlaubt</label></div>
                         </div>
@@ -344,7 +391,7 @@ $currentReportYear = $reportNow->format('Y');
                         <div class="report-period-panel" data-report-period-panel="year" hidden>
                             <label class="form-label" for="reportYear">Kalenderjahr</label>
                             <input class="form-control" id="reportYear" name="report_year" type="number" value="<?= h($currentReportYear) ?>" min="1970" max="2200" step="1" disabled required>
-                            <span class="report-layout-note"><strong>DIN A4 Querformat:</strong> Monatswerte, Urlaub, Krankheit, Feiertage und Jahresdifferenz auf einer Seite.</span>
+                            <span class="report-layout-note"><strong>DIN A4 Querformat:</strong> Monatswerte, Arbeitszeiten, Pausen, Urlaub, Krankheit und Feiertage auf einer Seite.</span>
                         </div>
                     </div>
                 </section>

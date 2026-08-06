@@ -1,3 +1,34 @@
+## Kompakter Arbeitszeiten-Planer in Mitarbeiterdetails (v26)
+
+- Urlaubskonto und Arbeitszeiten-Planer nutzen den verfügbaren Platz nun im Verhältnis 4:8 statt 5:7.
+- Montag bis Donnerstag stehen in einer gleichmäßigen ersten Reihe; Freitag bis Sonntag bilden eine breitere zweite Reihe.
+- Tagesnamen, Schalter und Stundenfelder werden nicht mehr gequetscht oder abgeschnitten.
+- Das Urlaubskonto verwendet im schmaleren Bereich eine übersichtliche zweispaltige Eingabeanordnung.
+- Hinweise zur Pausenregel sind optisch als eigener kompakter Informationsbereich abgesetzt.
+- Auf Tablets und Smartphones bricht der Planer automatisch auf zwei beziehungsweise eine Spalte um.
+- Für diese Layoutkorrektur ist keine Datenbankmigration erforderlich.
+
+## Individuelle Arbeitszeiten-Planung (v25)
+
+- Der historisierte Arbeitszeiten-Planer ist wieder aktiv und kann einzelne Wochentage vollständig als frei markieren.
+- Bereits beim Anlegen eines Mitarbeiters lässt sich der komplette Wochenplan festlegen.
+- Standardmäßig werden 38 Wochenstunden vorbelegt: Montag bis Donnerstag je 8:30 Stunden, Freitag 4:00 Stunden.
+- Die Wochenstunden werden automatisch aus den aktiven Tageswerten berechnet und nicht separat eingegeben.
+- Urlaub, Krankheit, Schule, sonstige Abwesenheiten und Feiertage verwenden die am jeweiligen Datum gültige individuelle Tageszeit; freie Tage zählen mit 0 Stunden.
+- Bei mehr als 6 geplanten Stunden gelten 30 Minuten Pausenanspruch. Arbeitsbeginn vor 08:00 Uhr wird zusätzlich als Frühstartzeit angerechnet.
+- Änderungen am Wochenplan gelten ab einem frei wählbaren Datum; frühere Auswertungen bleiben unverändert.
+- Die PDF-Zeitnachweise bleiben wie zuvor ohne Sollzeit- und Differenzspalten, zeigen im Kopf aber wieder die aktuelle Wochenstundenzahl.
+- Das Datenbankschema wurde auf Version 6 angehoben; vorhandene Arbeitszeitmodelle werden nicht mehr automatisch normalisiert.
+
+## Feste Arbeitszeiten und bereinigte Zeitnachweise (v24)
+
+- Für alle Mitarbeiter gelten verbindlich Montag bis Donnerstag jeweils **8:30 Stunden** und Freitag **4:00 Stunden**.
+- Importierte Wochenstunden und frühere individuelle Tagesmodelle werden nicht mehr ausgewertet; bestehende Werte werden beim Start auf 38 Wochenstunden normalisiert.
+- Urlaub, Krankheit, Schule, sonstige Abwesenheiten und Feiertage werden mit der festen Tageszeit angerechnet.
+- Das Arbeitszeitmodell sowie Wochenstunden und Sonderarbeitszeit wurden aus der Mitarbeiterverwaltung entfernt.
+- Wochen-, Monats- und Jahres-PDFs zeigen keine Sollzeiten oder Differenzen mehr, sondern nur erfasste beziehungsweise angerechnete Zeiten, Pausen und Abwesenheitsinformationen.
+- Das Datenbankschema wurde auf Version 5 angehoben.
+
 ## Ausgewogene Mitarbeiterfarben im Urlaubskalender (v22)
 
 - Die sehr kräftige Neon-Palette wurde durch eine ausgewogene, moderne Farbpalette ersetzt.
@@ -30,8 +61,8 @@
 - Administration kann zwischen **Woche**, **Monat** und **Jahr** wechseln und den gewünschten Zeitraum frei auswählen.
 - Für jede ausgewählte Person entsteht weiterhin genau eine eigene PDF-Seite.
 - Der Wochenbericht bleibt eine detaillierte A4-Hochformatseite mit sieben Tageszeilen und Unterschriftsfeld.
-- Der Monatsbericht nutzt A4-Querformat und zeigt alle Kalendertage mit Beginn, Ende, Pause, Arbeitszeit, Sollzeit, Differenz und Bemerkung kompakt auf einer Seite.
-- Der Jahresbericht nutzt A4-Querformat und fasst die zwölf Monate mit Sollzeit, Arbeitszeit, Pausen, Differenz, Urlaubs-, Krankheits-, Feiertags- und Anwesenheitstagen auf einer Seite zusammen.
+- Der Monatsbericht nutzt A4-Querformat und zeigt alle Kalendertage mit Beginn, Ende, Pause, Arbeitszeit und Bemerkung kompakt auf einer Seite.
+- Der Jahresbericht nutzt A4-Querformat und fasst die zwölf Monate mit Arbeitszeit, Pausen, Urlaubs-, Krankheits-, Feiertags- und Anwesenheitstagen auf einer Seite zusammen.
 - Abwesenheiten, Wochenenden und Feiertage werden in den PDF-Tabellen dezent farblich unterschieden.
 - Während einer laufenden Pause erhält die persönliche Stempeluhr einen sanft animierten orangefarbenen Seitenhintergrund und ein orange getöntes Uhr-Panel. Beim Beenden der Pause blendet die Darstellung wieder zurück.
 - Für diese Erweiterung ist keine Datenbankmigration erforderlich.

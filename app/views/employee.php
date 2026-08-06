@@ -11,6 +11,8 @@ foreach ($parts as $part) {
     $initials .= strtoupper(substr($part, 0, 1));
     if (strlen($initials) >= 2) break;
 }
+$weeklyMinutes = (int)round((float)$employee['weekly_hours'] * 60);
+$weeklyTimeLabel = sprintf('%d:%02d Std.', intdiv($weeklyMinutes, 60), $weeklyMinutes % 60);
 ?>
 <div id="employeeRoot" data-employee-id="<?= (int)$employee['id'] ?>">
     <a class="back-link" href="<?= h(url('/')) ?>">
@@ -41,7 +43,7 @@ foreach ($parts as $part) {
     </section>
 
     <div class="row g-4 mb-4 employee-settings-row">
-        <div class="col-xl-5">
+        <div class="col-xl-4">
             <section class="surface-card h-100 employee-settings-card" id="vacation-account">
                 <div class="section-heading compact-heading"><div><div class="eyebrow">Urlaub <?= (int)$vacationYear ?></div><h2>Urlaubskonto</h2></div><span class="count-badge"><?= h(number_format((float)$vacation['remaining_days'], 1, ',', '.')) ?> Tage</span></div>
                 <div class="employee-settings-body">
@@ -57,10 +59,10 @@ foreach ($parts as $part) {
                     <?php endif; ?>
                     <div class="employee-settings-form-section">
                         <form id="formVacation" data-employee-id="<?= (int)$employee['id'] ?>" class="row g-3">
-                            <div class="col-6 col-md-3"><label class="form-label">Jahr</label><input class="form-control" name="year" type="number" min="1970" max="2200" value="<?= (int)$vacationYear ?>" required></div>
-                            <div class="col-6 col-md-3"><label class="form-label">Anspruch</label><input class="form-control" name="entitlement_days" type="number" step="0.5" min="0" max="365" value="<?= h((string)$vacation['entitlement_days']) ?>"></div>
-                            <div class="col-6 col-md-3"><label class="form-label">Übertrag</label><input class="form-control<?= !empty($vacation['carryover_automatic']) ? ' is-readonly' : '' ?>" name="carryover_days" type="number" step="0.5" min="0" max="365" value="<?= h((string)$vacation['carryover_days']) ?>"<?= !empty($vacation['carryover_automatic']) ? ' readonly' : '' ?>><small class="form-text"><?= !empty($vacation['carryover_automatic']) ? 'Automatisch aus dem Vorjahr; gültig bis 31.03.' : 'Nur nötig, wenn kein Vorjahreskonto vorhanden ist.' ?></small></div>
-                            <div class="col-6 col-md-3"><label class="form-label">Korrektur</label><input class="form-control" name="adjustment_days" type="number" step="0.5" min="-365" max="365" value="<?= h((string)$vacation['adjustment_days']) ?>"></div>
+                            <div class="col-6"><label class="form-label">Jahr</label><input class="form-control" name="year" type="number" min="1970" max="2200" value="<?= (int)$vacationYear ?>" required></div>
+                            <div class="col-6"><label class="form-label">Anspruch</label><input class="form-control" name="entitlement_days" type="number" step="0.5" min="0" max="365" value="<?= h((string)$vacation['entitlement_days']) ?>"></div>
+                            <div class="col-6"><label class="form-label">Übertrag</label><input class="form-control<?= !empty($vacation['carryover_automatic']) ? ' is-readonly' : '' ?>" name="carryover_days" type="number" step="0.5" min="0" max="365" value="<?= h((string)$vacation['carryover_days']) ?>"<?= !empty($vacation['carryover_automatic']) ? ' readonly' : '' ?>><small class="form-text"><?= !empty($vacation['carryover_automatic']) ? 'Automatisch aus dem Vorjahr; gültig bis 31.03.' : 'Nur nötig, wenn kein Vorjahreskonto vorhanden ist.' ?></small></div>
+                            <div class="col-6"><label class="form-label">Korrektur</label><input class="form-control" name="adjustment_days" type="number" step="0.5" min="-365" max="365" value="<?= h((string)$vacation['adjustment_days']) ?>"></div>
                             <div class="col-12"><label class="form-label">Notiz</label><input class="form-control" name="note" maxlength="200" value="<?= h((string)($vacation['note'] ?? '')) ?>"></div>
                             <div class="col-12"><button class="btn btn-brand w-100" type="submit">Urlaubskonto speichern</button></div>
                         </form>
@@ -68,19 +70,63 @@ foreach ($parts as $part) {
                 </div>
             </section>
         </div>
-        <div class="col-xl-7">
-            <section class="surface-card h-100 employee-settings-card">
-                <div class="section-heading compact-heading"><div><div class="eyebrow">Historisiert</div><h2>Arbeitszeitmodell</h2><p>Neue Werte gelten ab dem gewählten Datum; alte Wochen bleiben unverändert.</p></div></div>
+        <div class="col-xl-8">
+            <section class="surface-card h-100 employee-settings-card employee-schedule-card">
+                <div class="section-heading compact-heading">
+                    <div>
+                        <div class="eyebrow">Historisiert</div>
+                        <h2>Arbeitszeiten-Planer</h2>
+                        <p>Arbeitstage können einzeln ausgeschaltet werden. Neue Werte gelten erst ab dem gewählten Datum.</p>
+                    </div>
+                    <div class="schedule-total schedule-total-compact" aria-live="polite">
+                        <span>Wochenzeit</span>
+                        <strong data-schedule-total><?= h($weeklyTimeLabel) ?></strong>
+                    </div>
+                </div>
                 <div class="employee-settings-body">
                     <form id="formSchedule" data-employee-id="<?= (int)$employee['id'] ?>" class="employee-schedule-form">
-                        <div class="schedule-days-grid">
-                            <?php foreach ($dayLabels as $weekday => $dayLabel): $hours = ((int)$schedule[$weekday]['target_minutes']) / 60; ?>
-                                <div><label class="form-label"><?= h(substr($dayLabel, 0, 2)) ?></label><input class="form-control" name="day_<?= $weekday ?>" type="number" min="0" max="24" step="0.25" value="<?= h(rtrim(rtrim(number_format($hours, 2, '.', ''), '0'), '.')) ?>"></div>
-                            <?php endforeach; ?>
+                        <div class="schedule-planner schedule-planner-detail" data-schedule-planner>
+                            <div class="schedule-day-cards">
+                                <?php foreach ($dayLabels as $weekday => $dayLabel): $minutes = (int)$schedule[$weekday]['target_minutes']; $hours = $minutes / 60; $enabled = $minutes > 0; ?>
+                                    <article class="schedule-day-card<?= $enabled ? '' : ' is-off' ?>" data-schedule-day>
+                                        <div class="schedule-day-card-head">
+                                            <div>
+                                                <strong><?= h($dayLabel) ?></strong>
+                                                <span><?= $enabled ? 'Arbeitstag' : 'Frei' ?></span>
+                                            </div>
+                                            <label class="schedule-day-switch" title="Arbeitstag ein- oder ausschalten">
+                                                <input type="checkbox" data-schedule-toggle<?= $enabled ? ' checked' : '' ?> aria-label="<?= h($dayLabel) ?> als Arbeitstag verwenden">
+                                                <span aria-hidden="true"></span>
+                                            </label>
+                                        </div>
+                                        <label class="form-label" for="scheduleDay<?= $weekday ?>">Stunden</label>
+                                        <div class="schedule-hours-input">
+                                            <input
+                                                class="form-control"
+                                                id="scheduleDay<?= $weekday ?>"
+                                                name="day_<?= $weekday ?>"
+                                                type="number"
+                                                min="0"
+                                                max="24"
+                                                step="0.25"
+                                                value="<?= h(rtrim(rtrim(number_format($hours, 2, '.', ''), '0'), '.')) ?>"
+                                                data-schedule-hours
+                                                data-default-hours="<?= $weekday === 5 ? '4' : '8.5' ?>"
+                                                <?= $enabled ? '' : 'disabled' ?>
+                                            >
+                                            <span>Std.</span>
+                                        </div>
+                                    </article>
+                                <?php endforeach; ?>
+                            </div>
+                            <div class="schedule-planner-note">
+                                <span>Bei mehr als 6 geplanten Stunden: 30 Min. Pause plus Frühstart vor 08:00 Uhr.</span>
+                                <span>Freie Tage werden bei Urlaub, Krankheit und Feiertagen mit 0 Stunden gewertet.</span>
+                            </div>
                         </div>
                         <div class="row g-3 schedule-effective-row">
                             <div class="col-md-4"><label class="form-label">Gültig ab</label><input class="form-control" name="effective_from" type="date" value="<?= h($today) ?>" required></div>
-                            <div class="col-md-8 d-flex align-items-end"><button class="btn btn-brand w-100" type="submit">Arbeitszeitmodell speichern</button></div>
+                            <div class="col-md-8 d-flex align-items-end"><button class="btn btn-brand w-100" type="submit">Arbeitszeiten speichern</button></div>
                         </div>
                     </form>
                 </div>

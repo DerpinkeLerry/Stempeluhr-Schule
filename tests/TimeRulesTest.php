@@ -53,6 +53,22 @@ assertRule(
     TimeClockService::calculateBreakAllowanceSeconds(new DateTimeImmutable('2026-07-31 07:30:00', $berlin)) === 1800,
     'Freitags darf bei Arbeitsbeginn um 07:30 Uhr nur die Frühzeit von 30 Minuten gutgeschrieben werden'
 );
+assertRule(
+    TimeClockService::calculateBreakAllowanceSeconds(new DateTimeImmutable('2026-07-31 08:00:00', $berlin), 510) === 1800,
+    'Auch an einem Freitag müssen bei mehr als 6 geplanten Stunden 30 Minuten Pause gelten'
+);
+assertRule(
+    TimeClockService::calculateBreakAllowanceSeconds(new DateTimeImmutable('2026-07-30 07:50:00', $berlin), 240) === 600,
+    'Bei einem kurzen Arbeitstag darf nur der Frühstart als Pausenzeit zählen'
+);
+assertRule(
+    TimeClockService::calculateBreakAllowanceSeconds(new DateTimeImmutable('2026-07-30 08:00:00', $berlin), 360) === 0,
+    'Bei genau 6 geplanten Stunden darf keine Grundpause addiert werden'
+);
+assertRule(
+    TimeClockService::calculateBreakAllowanceSeconds(new DateTimeImmutable('2026-07-30 08:00:00', $berlin), 361) === 1800,
+    'Bei mehr als 6 geplanten Stunden müssen 30 Minuten Grundpause gelten'
+);
 
 assertRule(
     TimeClockService::calculateAbsenceCreditSeconds(1) === 8 * 3600 + 30 * 60,

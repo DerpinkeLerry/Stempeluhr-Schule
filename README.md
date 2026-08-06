@@ -6,10 +6,10 @@ PHP-Anwendung zur Arbeitszeit-, Pausen-, Abwesenheits- und Urlaubsverwaltung mit
 
 - Login für Administration und Mitarbeiter
 - Arbeitsbeginn, Feierabend und beliebig viele Pausen
-- konfigurierbare Zeitregeln pro Wochentag
+- individueller, historisierter Arbeitszeiten-Planer pro Mitarbeiter und Wochentag
+- Standardplan bei der Anlage: Montag bis Donnerstag 8:30 Stunden, Freitag 4:00 Stunden
 - Mitarbeiterstammdaten mit eindeutiger Personalnummer
 - aktive und inaktive Beschäftigte ohne Verlust ihrer Historie
-- historisierte Arbeitszeitmodelle pro Wochentag
 - Urlaubskonto pro Kalenderjahr mit Anspruch, Übertrag und Korrektur
 - gemeinsamer Urlaubskalender für alle aktiven Mitarbeiter als kompakte, bildschirmbreite Jahresübersicht
 - direkte Urlaubsauswahl für Administratoren per Klick oder Ziehen über die Tagesfelder oder den Tageskopf
@@ -19,7 +19,7 @@ PHP-Anwendung zur Arbeitszeit-, Pausen-, Abwesenheits- und Urlaubsverwaltung mit
 - serverseitige Sperre bei nicht ausreichendem Urlaubsbestand
 - ganze sowie halbe Urlaubstage vormittags oder nachmittags
 - Krankheit, Schule und sonstige Abwesenheiten
-- Wochen-, Monats- und Jahresnachweise als PDF; jede Person erhält genau eine eigene, druckfertige Seite
+- Wochen-, Monats- und Jahresnachweise als PDF ohne Sollzeit- oder Differenzspalten; jede Person erhält genau eine eigene, druckfertige Seite
 - deutliche orange Pausenansicht, damit ein laufender Pausenstatus auch aus größerer Entfernung erkennbar ist
 - Feiertage für Bayern/Kaufbeuren von 2025 bis 2035
 
@@ -60,7 +60,7 @@ Die Datenbank liegt unter:
 data/stempeluhr.sqlite
 ```
 
-Das Projekt verwendet Schema-Version 4. Eine ältere Projektdatenbank wird beim ersten Aufruf automatisch strukturell migriert. Version 4 erweitert das dauerhafte Urlaubsantragsarchiv um Änderungs- und Löschanträge für bestehende Urlaube. Vor jedem Update muss die SQLite-Datei trotzdem separat gesichert werden.
+Das Projekt verwendet Schema-Version 6. Eine ältere Projektdatenbank wird beim ersten Aufruf automatisch strukturell migriert. Version 6 aktiviert die individuellen, historisierten Wochenpläne wieder. Bereits vorhandene Arbeitszeitmodelle werden nicht mehr automatisch überschrieben. Vor jedem Update muss die SQLite-Datei trotzdem separat gesichert werden.
 
 Die vollständige Tabellenbeschreibung steht in:
 
@@ -68,13 +68,16 @@ Die vollständige Tabellenbeschreibung steht in:
 database/STRUCTURE.md
 ```
 
-Die mitgelieferte Datenbank ist bereits auf Version 4 vorbereitet.
+Die mitgelieferte Datenbank ist bereits auf Version 6 vorbereitet.
 
 ## Wichtige Datenregeln
 
 - Personalnummern sind für neu angelegte Mitarbeiter Pflicht und eindeutig.
 - Mitarbeiter werden beim Entfernen nur deaktiviert. Historische Daten bleiben erhalten.
-- Änderungen am Wochenplan gelten ab einem wählbaren Datum und überschreiben keine Vergangenheit.
+- Neue Mitarbeiter starten mit 38 Wochenstunden: Montag bis Donnerstag jeweils 8:30 Stunden, Freitag 4:00 Stunden.
+- Jeder Wochentag kann individuell angepasst oder vollständig als freier Tag ausgeschaltet werden. Änderungen gelten ab einem wählbaren Datum und verändern keine Vergangenheit.
+- Urlaub, Krankheit, Schule, sonstige Abwesenheiten und Feiertage werden an eingeplanten Arbeitstagen mit der individuell hinterlegten Tageszeit angerechnet.
+- Bei mehr als 6 geplanten Stunden werden 30 Minuten Pausenanspruch berücksichtigt. Arbeitsbeginn vor 08:00 Uhr erhöht diesen Wert zusätzlich um die entsprechende Frühstartzeit.
 - Urlaub wird aus den genehmigten Abwesenheiten berechnet; halbe Tage zählen als `0,5`.
 - Ungenutzter regulärer Jahresurlaub wird automatisch ins Folgejahr übertragen. Dieser Übertrag kann nur für Urlaubstage bis einschließlich 31. März verwendet werden und verfällt danach.
 - Neue Urlaubs- und Verschiebungsanträge sowie direkte Urlaubseinträge werden blockiert, sobald der verfügbare Bestand nicht ausreicht.
@@ -128,7 +131,7 @@ PRAGMA foreign_key_check;
 
 ```text
 app/                 PHP-Code, Services und Views
-database/schema.sql  vollständiges Schema Version 4
+database/schema.sql  vollständiges Schema Version 6
 database/STRUCTURE.md Datenmodell und Migrationshinweise
 data/                SQLite-Datenbank
 public/              einziger öffentlicher Webordner

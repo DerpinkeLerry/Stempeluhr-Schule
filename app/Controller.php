@@ -59,6 +59,15 @@ final class Controller
         return (int)($leftEmployee['id'] ?? 0) <=> (int)($rightEmployee['id'] ?? 0);
     }
 
+    private function postedScheduleHours(string $prefix = 'schedule_day_'): array
+    {
+        $hours = [];
+        for ($weekday = 1; $weekday <= 7; $weekday++) {
+            $hours[$weekday] = $_POST[$prefix . $weekday] ?? 0;
+        }
+        return $hours;
+    }
+
     public function renderStatusBadge(array $status, bool $large = false): string
     {
         $classes = [
@@ -372,10 +381,11 @@ final class Controller
                 (string)($_POST['personnel_number'] ?? ''),
                 (string)($_POST['department'] ?? ''),
                 (string)($_POST['phone'] ?? ''),
-                (float)($_POST['weekly_hours'] ?? 38),
+                TimeClockService::DEFAULT_WEEKLY_HOURS,
                 isset($_POST['is_trainee']),
-                isset($_POST['special_time']),
-                (float)($_POST['vacation_entitlement'] ?? cfg('default_vacation_entitlement', 30))
+                false,
+                (float)($_POST['vacation_entitlement'] ?? cfg('default_vacation_entitlement', 30)),
+                $this->postedScheduleHours()
             );
             json_response(['ok' => true, 'employeeId' => $id]);
         } catch (RuntimeException $e) {
@@ -404,9 +414,9 @@ final class Controller
                 (string)($_POST['personnel_number'] ?? ''),
                 (string)($_POST['department'] ?? ''),
                 (string)($_POST['phone'] ?? ''),
-                isset($_POST['weekly_hours']) ? (float)$_POST['weekly_hours'] : null,
+                null,
                 isset($_POST['is_trainee']),
-                isset($_POST['special_time']),
+                false,
                 isset($_POST['active']),
                 isset($_POST['login_enabled'])
             );
@@ -442,6 +452,26 @@ final class Controller
         }
     }
 
+    public function apiScheduleUpdate(): never
+    {
+        require_post();
+        verify_csrf();
+        require_admin(true);
+
+        try {
+            $this->service->updateSchedule(
+                (int)($_POST['employeeId'] ?? 0),
+                (string)($_POST['effective_from'] ?? ''),
+                $this->postedScheduleHours('day_')
+            );
+            json_response(['ok' => true]);
+        } catch (RuntimeException $e) {
+            json_response(['ok' => false, 'error' => $e->getMessage()], 400);
+        } catch (Throwable) {
+            json_response(['ok' => false, 'error' => 'Arbeitszeitmodell konnte nicht gespeichert werden'], 500);
+        }
+    }
+
     public function apiAction(): never
     {
         require_post();
@@ -467,30 +497,6 @@ final class Controller
             json_response(['ok' => false, 'error' => $e->getMessage()], 400);
         } catch (Throwable) {
             json_response(['ok' => false, 'error' => 'Aktion konnte nicht gespeichert werden'], 500);
-        }
-    }
-
-    public function apiScheduleUpdate(): never
-    {
-        require_post();
-        verify_csrf();
-        require_admin(true);
-
-        try {
-            $hours = [];
-            for ($weekday = 1; $weekday <= 7; $weekday++) {
-                $hours[$weekday] = (float)($_POST['day_' . $weekday] ?? 0);
-            }
-            $this->service->updateSchedule(
-                (int)($_POST['employeeId'] ?? 0),
-                (string)($_POST['effective_from'] ?? ''),
-                $hours
-            );
-            json_response(['ok' => true]);
-        } catch (RuntimeException $e) {
-            json_response(['ok' => false, 'error' => $e->getMessage()], 400);
-        } catch (Throwable) {
-            json_response(['ok' => false, 'error' => 'Arbeitszeitmodell konnte nicht gespeichert werden'], 500);
         }
     }
 

@@ -471,6 +471,73 @@
         }
     });
 
+    function formatScheduleMinutes(totalMinutes) {
+        const safeMinutes = Math.max(0, Math.round(totalMinutes || 0));
+        const hours = Math.floor(safeMinutes / 60);
+        const minutes = safeMinutes % 60;
+        return `${hours}:${String(minutes).padStart(2, '0')} Std.`;
+    }
+
+    function initializeSchedulePlanner(planner) {
+        const total = planner.querySelector('[data-schedule-total]')
+            || planner.closest('.employee-settings-card')?.querySelector('[data-schedule-total]');
+        const dayCards = Array.from(planner.querySelectorAll('[data-schedule-day]'));
+
+        const update = () => {
+            let totalMinutes = 0;
+            dayCards.forEach(card => {
+                const toggle = card.querySelector('[data-schedule-toggle]');
+                const input = card.querySelector('[data-schedule-hours]');
+                const status = card.querySelector('.schedule-day-card-head span');
+                if (!toggle || !input) return;
+
+                const enabled = toggle.checked;
+                input.disabled = !enabled;
+                card.classList.toggle('is-off', !enabled);
+                if (status) status.textContent = enabled ? 'Arbeitstag' : 'Frei';
+                if (enabled) {
+                    totalMinutes += Math.max(0, Math.round((Number.parseFloat(input.value) || 0) * 60));
+                }
+            });
+            if (total) total.textContent = formatScheduleMinutes(totalMinutes);
+        };
+
+        dayCards.forEach(card => {
+            const toggle = card.querySelector('[data-schedule-toggle]');
+            const input = card.querySelector('[data-schedule-hours]');
+            if (!toggle || !input) return;
+
+            if ((Number.parseFloat(input.value) || 0) > 0) {
+                input.dataset.lastHours = input.value;
+            }
+
+            toggle.addEventListener('change', () => {
+                if (!toggle.checked) {
+                    const current = Number.parseFloat(input.value) || 0;
+                    if (current > 0) input.dataset.lastHours = input.value;
+                } else if ((Number.parseFloat(input.value) || 0) <= 0) {
+                    input.value = input.dataset.lastHours || input.dataset.defaultHours || '8.5';
+                }
+                update();
+            });
+
+            input.addEventListener('input', update);
+            input.addEventListener('change', () => {
+                const current = Number.parseFloat(input.value) || 0;
+                if (current <= 0) {
+                    toggle.checked = false;
+                } else {
+                    input.dataset.lastHours = input.value;
+                }
+                update();
+            });
+        });
+
+        update();
+    }
+
+    document.querySelectorAll('[data-schedule-planner]').forEach(initializeSchedulePlanner);
+
     const employeeForm = document.getElementById('formEmployee');
     if (employeeForm) {
         employeeForm.addEventListener('submit', async event => {
@@ -504,9 +571,7 @@
         employeeEditForm.elements.personnel_number.value = button.dataset.personnelNumber || '';
         employeeEditForm.elements.department.value = button.dataset.department || '';
         employeeEditForm.elements.phone.value = button.dataset.phone || '';
-        employeeEditForm.elements.weekly_hours.value = button.dataset.weeklyHours || '0';
         employeeEditForm.elements.is_trainee.checked = button.dataset.isTrainee === '1';
-        employeeEditForm.elements.special_time.checked = button.dataset.specialTime === '1';
         employeeEditForm.elements.active.checked = button.dataset.active === '1';
         employeeEditForm.elements.login_enabled.checked = button.dataset.loginEnabled === '1';
         employeeEditForm.elements.password.value = '';
@@ -561,6 +626,24 @@
         });
     }
 
+    const scheduleForm = document.getElementById('formSchedule');
+    if (scheduleForm) {
+        scheduleForm.addEventListener('submit', async event => {
+            event.preventDefault();
+            const submit = scheduleForm.querySelector('[type="submit"]');
+            const data = Object.fromEntries(new FormData(scheduleForm).entries());
+            data.employeeId = scheduleForm.dataset.employeeId;
+            setButtonLoading(submit, true);
+            try {
+                await apiPost('/api/schedule/update', data);
+                location.reload();
+            } catch (error) {
+                showToast(error.message, 'danger');
+                setButtonLoading(submit, false);
+            }
+        });
+    }
+
     const absenceForm = document.getElementById('formAbsence');
     if (absenceForm) {
         absenceForm.addEventListener('submit', async event => {
@@ -598,24 +681,6 @@
             setButtonLoading(submit, true);
             try {
                 await apiPost('/api/absence/update', Object.fromEntries(new FormData(absenceEditForm).entries()));
-                location.reload();
-            } catch (error) {
-                showToast(error.message, 'danger');
-                setButtonLoading(submit, false);
-            }
-        });
-    }
-
-    const scheduleForm = document.getElementById('formSchedule');
-    if (scheduleForm) {
-        scheduleForm.addEventListener('submit', async event => {
-            event.preventDefault();
-            const submit = scheduleForm.querySelector('[type="submit"]');
-            const data = Object.fromEntries(new FormData(scheduleForm).entries());
-            data.employeeId = scheduleForm.dataset.employeeId;
-            setButtonLoading(submit, true);
-            try {
-                await apiPost('/api/schedule/update', data);
                 location.reload();
             } catch (error) {
                 showToast(error.message, 'danger');
@@ -679,7 +744,7 @@
         },
         year: {
             eyebrow: 'Jährlicher Nachweis',
-            description: 'Die zwölf Monate mit Arbeitszeit, Saldo und Abwesenheitskennzahlen auf einer Seite je Mitarbeiter.',
+            description: 'Die zwölf Monate mit Arbeitszeit, Pausen und Abwesenheitskennzahlen auf einer Seite je Mitarbeiter.',
             button: 'Jahres-PDF öffnen'
         }
     };

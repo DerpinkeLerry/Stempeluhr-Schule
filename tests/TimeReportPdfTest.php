@@ -78,5 +78,7 @@ $pdf = (new TimeReportPdfRenderer())->render($report);
 assertTimeReport(str_starts_with($pdf, '%PDF-1.4'), 'Der Renderer muss eine PDF-Datei erzeugen');
 assertTimeReport(str_contains($pdf, '/Count 2'), 'Jeder Mitarbeiter muss genau eine eigene PDF-Seite erhalten');
 assertTimeReport(str_contains($pdf, '/MediaBox [0 0 841.89 595.28]'), 'Monatsberichte müssen im A4-Querformat erzeugt werden');
+assertTimeReport(!str_contains($pdf, 'Sollzeit'), 'Sollzeiten dürfen im Zeitnachweis nicht mehr erscheinen');
+assertTimeReport(!str_contains($pdf, 'Differenz'), 'Differenzen dürfen im Zeitnachweis nicht mehr erscheinen');
 
 echo "[OK] Zeitnachweis-Zeiträume und PDF-Seiten erfolgreich geprüft.\n";
