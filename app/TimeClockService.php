@@ -173,7 +173,7 @@ final class TimeClockService
 
     public function getEmployeeForLogin(string $email): ?array
     {
-        $st = $this->pdo->prepare('SELECT * FROM employee WHERE email=? AND active=1 AND login_enabled=1 LIMIT 1');
+        $st = $this->pdo->prepare('SELECT * FROM employee WHERE email=? AND active=1 LIMIT 1');
         $st->execute([strtolower(trim($email))]);
         return $st->fetch() ?: null;
     }
@@ -395,15 +395,12 @@ final class TimeClockService
         ?float $weeklyHours = null,
         bool $isTrainee = false,
         bool $specialTime = false,
-        bool $active = true,
-        bool $loginEnabled = true
+        bool $active = true
     ): void {
         $employee = $this->getEmployee($employeeId);
         if (!$employee) {
             throw new RuntimeException('Mitarbeiter wurde nicht gefunden');
         }
-        $hasStoredPassword = trim((string)($employee['password_hash'] ?? '')) !== '';
-
         $name = trim($name);
         $email = strtolower(trim($email));
         $personnelNumber = trim($personnelNumber);
@@ -425,24 +422,14 @@ final class TimeClockService
             throw new RuntimeException('Das neue Passwort braucht mindestens 6 Zeichen');
         }
 
-        // Importierte Mitarbeiter besitzen zunächst bewusst keinen Web-Zugang.
-        // Sobald erstmals ein Passwort vergeben wird, wird der Zugang für aktive
-        // Mitarbeiter automatisch freigeschaltet. Ein vorhandener Zugang kann
-        // weiterhin unabhängig vom Passwort deaktiviert bleiben.
-        if ($password !== '' && !$hasStoredPassword && $active) {
-            $loginEnabled = true;
-        }
-        if ($loginEnabled && !$hasStoredPassword && $password === '') {
-            throw new RuntimeException('Für die Anmeldung muss zuerst ein Passwort vergeben werden');
-        }
         try {
             new DateTimeZone($timezone);
         } catch (Throwable) {
             throw new RuntimeException('Die Zeitzone ist ungültig');
         }
 
-        if ($employeeId === $actingAdminId && ($role !== 'admin' || !$active || !$loginEnabled)) {
-            throw new RuntimeException('Das eigene Admin-Konto muss aktiv und anmeldbar bleiben');
+        if ($employeeId === $actingAdminId && ($role !== 'admin' || !$active)) {
+            throw new RuntimeException('Das eigene Admin-Konto muss aktiv bleiben');
         }
         if (
             $employee['role'] === 'admin'
@@ -470,7 +457,7 @@ final class TimeClockService
             $isTrainee ? 1 : 0,
             $specialTime ? 1 : 0,
             $active ? 1 : 0,
-            $loginEnabled ? 1 : 0,
+            $active ? 1 : 0,
             $this->nowUtc(),
         ];
         if ($password !== '') {

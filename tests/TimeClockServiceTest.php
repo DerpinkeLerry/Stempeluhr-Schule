@@ -60,6 +60,18 @@ function expectRuntimeException(callable $callback, string $messagePart): void
 
 $tests = [];
 
+$tests['Aktive Mitarbeiter koennen unabhaengig vom alten Login-Schalter anmelden'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-30 10:00:00');
+    $pdo->prepare('UPDATE employee SET password_hash=?, login_enabled=0, active=1 WHERE id=?')
+        ->execute([password_hash('test123', PASSWORD_DEFAULT), $employeeId]);
+
+    $employee = $service->getEmployeeForLogin('TEST@EXAMPLE.LOCAL');
+    assertSameValue($employeeId, (int)($employee['id'] ?? 0), 'Ein aktiver Mitarbeiter darf nicht mehr durch login_enabled blockiert werden');
+
+    $pdo->prepare('UPDATE employee SET active=0, login_enabled=1 WHERE id=?')->execute([$employeeId]);
+    assertSameValue(null, $service->getEmployeeForLogin('test@example.local'), 'Ein inaktiver Mitarbeiter darf sich weiterhin nicht anmelden');
+};
+
 $tests['Arbeitsbeginn vor 07:30 wird verhindert'] = static function (): void {
     [$pdo, $service, &$clock, $employeeId] = newTestContext('2026-07-30 05:29:59'); // 07:29:59 in Berlin
     expectRuntimeException(static fn() => $service->startWork($employeeId), 'frühestens ab 07:30 Uhr');

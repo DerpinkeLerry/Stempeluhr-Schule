@@ -15,7 +15,7 @@ Wichtige Felder:
 - `is_trainee`: Kennzeichnung als Auszubildender
 - `special_time`: technisches Alt-Feld; die Anwendung setzt es fest auf `0`
 - `active`: Beschäftigungsstatus
-- `login_enabled`: Anmeldung an der Stempeluhr erlaubt
+- `login_enabled`: technisches Kompatibilitätsfeld; die Anmeldung richtet sich ausschließlich nach `active` sowie gültiger E-Mail und Passwort
 
 Mitarbeiter werden nicht physisch gelöscht. Beim Deaktivieren bleiben Zeiten, Pausen, Abwesenheiten und Urlaubskonten erhalten.
 

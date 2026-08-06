@@ -417,8 +417,7 @@ final class Controller
                 null,
                 isset($_POST['is_trainee']),
                 false,
-                isset($_POST['active']),
-                isset($_POST['login_enabled'])
+                isset($_POST['active'])
             );
 
             if ($employeeId === $actingAdminId) {

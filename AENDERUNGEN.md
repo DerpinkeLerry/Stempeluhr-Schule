@@ -1,3 +1,11 @@
+## Version 33 – Anmeldung für alle aktiven Mitarbeiter
+
+- Der Schalter „Anmeldung erlaubt“ wurde aus der Mitarbeiterverwaltung entfernt.
+- Jeder aktive Mitarbeiter kann sich mit seiner E-Mail-Adresse und seinem Passwort anmelden.
+- Bereits importierte aktive Mitarbeiter werden nicht mehr durch den alten Wert `login_enabled` blockiert.
+- Inaktive beziehungsweise ausgeschiedene Mitarbeiter bleiben von der Anmeldung ausgeschlossen.
+- Das bestehende Datenbankschema bleibt kompatibel; eine Migration ist nicht erforderlich.
+
 ## Version 29 – Anmeldung importierter Mitarbeiter
 
 - Beim ersten Vergeben eines Passworts wird der Login für aktive importierte Mitarbeiter automatisch aktiviert.

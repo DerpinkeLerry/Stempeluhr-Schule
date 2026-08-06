@@ -573,7 +573,6 @@
         employeeEditForm.elements.phone.value = button.dataset.phone || '';
         employeeEditForm.elements.is_trainee.checked = button.dataset.isTrainee === '1';
         employeeEditForm.elements.active.checked = button.dataset.active === '1';
-        employeeEditForm.elements.login_enabled.checked = button.dataset.loginEnabled === '1';
         employeeEditForm.elements.password.value = '';
 
         const isOwnAccount = button.dataset.employeeId === employeeEditForm.dataset.currentAdminId;
@@ -594,16 +593,6 @@
     });
 
     if (employeeEditForm) {
-        const passwordInput = employeeEditForm.elements.password;
-        const loginEnabledInput = employeeEditForm.elements.login_enabled;
-        const activeInput = employeeEditForm.elements.active;
-
-        passwordInput?.addEventListener('input', () => {
-            if (passwordInput.value !== '' && activeInput?.checked && loginEnabledInput) {
-                loginEnabledInput.checked = true;
-            }
-        });
-
         employeeEditForm.addEventListener('submit', async event => {
             event.preventDefault();
             const submit = employeeEditForm.querySelector('[type="submit"]');

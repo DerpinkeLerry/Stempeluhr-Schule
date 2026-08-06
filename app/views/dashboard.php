@@ -256,7 +256,6 @@ $defaultScheduleHours = [1 => 8.5, 2 => 8.5, 3 => 8.5, 4 => 8.5, 5 => 4.0, 6 => 
                                 data-phone="<?= h((string)($employee['phone'] ?? '')) ?>"
                                 data-is-trainee="<?= (int)($employee['is_trainee'] ?? 0) ?>"
                                 data-active="<?= (int)($employee['active'] ?? 0) ?>"
-                                data-login-enabled="<?= (int)($employee['login_enabled'] ?? 0) ?>"
                             >
                                 Bearbeiten
                                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 4 6 6M4 20l4-1 11-11a2 2 0 0 0-3-3L5 16l-1 4Z"/></svg>
@@ -285,9 +284,9 @@ $defaultScheduleHours = [1 => 8.5, 2 => 8.5, 3 => 8.5, 4 => 8.5, 5 => 4.0, 6 => 
                 <input type="hidden" name="employeeId">
                 <div class="modal-header">
                     <div class="modal-title-group">
-                        <div class="eyebrow">Zugang verwalten</div>
+                        <div class="eyebrow">Mitarbeiter verwalten</div>
                         <h2 class="modal-title" id="employeeEditTitle">Mitarbeiter bearbeiten</h2>
-                        <p>Stammdaten, Zugang und Beschäftigungsstatus verwalten.</p>
+                        <p>Stammdaten, Rolle und Beschäftigungsstatus verwalten.</p>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
                 </div>
@@ -302,7 +301,7 @@ $defaultScheduleHours = [1 => 8.5, 2 => 8.5, 3 => 8.5, 4 => 8.5, 5 => 4.0, 6 => 
                         <div class="col-md-6">
                             <label class="form-label">Neues Passwort</label>
                             <input class="form-control" name="password" type="password" minlength="6" autocomplete="new-password" placeholder="Leer lassen, um es beizubehalten">
-                            <div class="form-text">Beim ersten Passwort wird der Zugang für aktive importierte Mitarbeiter automatisch freigeschaltet.</div>
+                            <div class="form-text">Aktive Mitarbeiter können sich automatisch mit E-Mail-Adresse und Passwort anmelden.</div>
                         </div>
                         <div class="col-md-6"><label class="form-label">Zeitzone</label><select class="form-select" name="timezone" required>
                             <?php foreach ($timezoneOptions as $group => $options): ?><optgroup label="<?= h($group) ?>"><?php foreach ($options as $option): ?><option value="<?= h($option['value']) ?>"><?= h($option['label']) ?></option><?php endforeach; ?></optgroup><?php endforeach; ?>
@@ -310,7 +309,6 @@ $defaultScheduleHours = [1 => 8.5, 2 => 8.5, 3 => 8.5, 4 => 8.5, 5 => 4.0, 6 => 
                         <div class="col-12 d-flex flex-wrap gap-4">
                             <div class="form-check"><input class="form-check-input" name="is_trainee" id="editTrainee" type="checkbox" value="1"><label class="form-check-label" for="editTrainee">Auszubildender</label></div>
                             <div class="form-check"><input class="form-check-input" name="active" id="editActive" type="checkbox" value="1"><label class="form-check-label" for="editActive">Aktiv beschäftigt</label></div>
-                            <div class="form-check"><input class="form-check-input" name="login_enabled" id="editLogin" type="checkbox" value="1"><label class="form-check-label" for="editLogin">Anmeldung erlaubt</label></div>
                         </div>
                     </div>
                 </div>
