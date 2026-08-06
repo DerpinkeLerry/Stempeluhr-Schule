@@ -312,3 +312,12 @@ Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.
 - Die Tagesanzeige in Mitarbeiterübersicht und Mitarbeiterprofil berücksichtigt die Abwesenheits- beziehungsweise Feiertagsgutschrift nun ebenfalls.
 - Historische Import-Gutschriften überschreiben die aktuelle, zum jeweiligen Datum gültige Arbeitszeitplanung nicht mehr.
 - Keine Datenbankänderung erforderlich.
+
+## 06.08.2026 – Feste Mitarbeiterreihenfolge im Urlaubskalender
+
+- Jeder Mitarbeiter belegt innerhalb eines Monats nur noch eine feste Zeile, unabhängig davon, an welchem Tag sein Urlaub beginnt.
+- Die Zeilen folgen der alphabetischen Mitarbeiterreihenfolge; dadurch bleibt die relative Position der Personen in allen Monaten konsistent.
+- Mehrere getrennte Urlaube derselben Person werden im selben Monat immer auf derselben Spur dargestellt.
+- Es werden weiterhin nur Mitarbeiter mit Urlaub im jeweiligen Monat als Zeile berücksichtigt, damit die Jahresübersicht kompakt bleibt.
+- Dezente horizontale Trennlinien verbessern die Lesbarkeit der festen Spuren.
+- Keine Datenbankänderung erforderlich.

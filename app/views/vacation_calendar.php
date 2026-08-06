@@ -101,8 +101,10 @@ foreach ($employees as $employee) {
 }
 
 // The full-year view follows the compact planning-board model of the previous
-// calendar: months run vertically, days horizontally, and overlapping vacations
-// are placed on the smallest possible number of tracks.
+// calendar: months run vertically and days horizontally. Every employee keeps
+// one stable, alphabetically ordered lane within each month so names do not jump
+// between rows depending on the start date of a vacation.
+$employeeTrackOrder = array_map(static fn(array $employee): int => (int)$employee['id'], $employees);
 $yearMatrixMonths = [];
 foreach ($monthNames as $monthNumber => $monthName) {
     $matrixMonthStart = sprintf('%04d-%02d-01', $year, $monthNumber);
@@ -177,15 +179,10 @@ foreach ($monthNames as $monthNumber => $monthName) {
     }
 
     $segments = vacation_calendar_merge_visual_segments($rawSegments);
+    $trackLayout = vacation_calendar_assign_employee_tracks($segments, $employeeTrackOrder);
+    $segments = $trackLayout['segments'];
 
-    $trackEndDays = [];
     foreach ($segments as $index => $segment) {
-        $track = 0;
-        while (isset($trackEndDays[$track]) && $segment['start_day'] <= $trackEndDays[$track]) {
-            $track++;
-        }
-        $trackEndDays[$track] = $segment['end_day'];
-
         $visibleStartDate = (string)($segment['visible_start_date'] ?? '');
         $visibleEndDate = (string)($segment['visible_end_date'] ?? '');
         $visiblePeriod = $visibleStartDate !== '' && $visibleEndDate !== ''
@@ -193,7 +190,6 @@ foreach ($monthNames as $monthNumber => $monthName) {
                 . ($visibleStartDate === $visibleEndDate ? '' : ' – ' . date('d.m.Y', strtotime($visibleEndDate)))
             : (string)$segment['period_label'];
 
-        $segments[$index]['track'] = $track + 1;
         $segments[$index]['group_id'] = 'm' . $monthNumber . '-e' . (int)$segment['employee_id'] . '-g' . ($index + 1);
         $segments[$index]['visual_period_label'] = $visiblePeriod;
         $segments[$index]['bar_label'] = (string)$segment['employee']['name'];
@@ -203,7 +199,7 @@ foreach ($monthNames as $monthNumber => $monthName) {
         'name' => $monthName,
         'days' => $matrixDays,
         'segments' => $segments,
-        'track_count' => max(1, count($trackEndDays)),
+        'track_count' => (int)$trackLayout['track_count'],
         'vacation_count' => count($monthVacationIds),
         'employee_count' => count($monthEmployeeIds),
         'is_current' => $year === (int)date('Y', strtotime($today))
