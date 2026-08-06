@@ -402,6 +402,7 @@ final class TimeClockService
         if (!$employee) {
             throw new RuntimeException('Mitarbeiter wurde nicht gefunden');
         }
+        $hasStoredPassword = trim((string)($employee['password_hash'] ?? '')) !== '';
 
         $name = trim($name);
         $email = strtolower(trim($email));
@@ -422,6 +423,17 @@ final class TimeClockService
         }
         if ($password !== '' && strlen($password) < 6) {
             throw new RuntimeException('Das neue Passwort braucht mindestens 6 Zeichen');
+        }
+
+        // Importierte Mitarbeiter besitzen zunächst bewusst keinen Web-Zugang.
+        // Sobald erstmals ein Passwort vergeben wird, wird der Zugang für aktive
+        // Mitarbeiter automatisch freigeschaltet. Ein vorhandener Zugang kann
+        // weiterhin unabhängig vom Passwort deaktiviert bleiben.
+        if ($password !== '' && !$hasStoredPassword && $active) {
+            $loginEnabled = true;
+        }
+        if ($loginEnabled && !$hasStoredPassword && $password === '') {
+            throw new RuntimeException('Für die Anmeldung muss zuerst ein Passwort vergeben werden');
         }
         try {
             new DateTimeZone($timezone);

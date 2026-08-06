@@ -594,6 +594,16 @@
     });
 
     if (employeeEditForm) {
+        const passwordInput = employeeEditForm.elements.password;
+        const loginEnabledInput = employeeEditForm.elements.login_enabled;
+        const activeInput = employeeEditForm.elements.active;
+
+        passwordInput?.addEventListener('input', () => {
+            if (passwordInput.value !== '' && activeInput?.checked && loginEnabledInput) {
+                loginEnabledInput.checked = true;
+            }
+        });
+
         employeeEditForm.addEventListener('submit', async event => {
             event.preventDefault();
             const submit = employeeEditForm.querySelector('[type="submit"]');

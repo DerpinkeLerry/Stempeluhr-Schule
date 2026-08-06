@@ -299,7 +299,11 @@ $defaultScheduleHours = [1 => 8.5, 2 => 8.5, 3 => 8.5, 4 => 8.5, 5 => 4.0, 6 => 
                         <div class="col-md-6"><label class="form-label">Telefon</label><input class="form-control" name="phone" maxlength="50"></div>
                         <div class="col-md-6"><label class="form-label">Abteilung</label><input class="form-control" name="department" maxlength="100"></div>
                         <div class="col-md-6"><label class="form-label">Rolle</label><select class="form-select" name="role"><option value="employee">Mitarbeiter</option><option value="admin">Administration</option></select></div>
-                        <div class="col-md-6"><label class="form-label">Neues Passwort</label><input class="form-control" name="password" type="password" minlength="6" autocomplete="new-password" placeholder="Leer lassen, um es beizubehalten"></div>
+                        <div class="col-md-6">
+                            <label class="form-label">Neues Passwort</label>
+                            <input class="form-control" name="password" type="password" minlength="6" autocomplete="new-password" placeholder="Leer lassen, um es beizubehalten">
+                            <div class="form-text">Beim ersten Passwort wird der Zugang für aktive importierte Mitarbeiter automatisch freigeschaltet.</div>
+                        </div>
                         <div class="col-md-6"><label class="form-label">Zeitzone</label><select class="form-select" name="timezone" required>
                             <?php foreach ($timezoneOptions as $group => $options): ?><optgroup label="<?= h($group) ?>"><?php foreach ($options as $option): ?><option value="<?= h($option['value']) ?>"><?= h($option['label']) ?></option><?php endforeach; ?></optgroup><?php endforeach; ?>
                         </select></div>

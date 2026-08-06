@@ -1,3 +1,10 @@
+## Version 29 – Anmeldung importierter Mitarbeiter
+
+- Beim ersten Vergeben eines Passworts wird der Login für aktive importierte Mitarbeiter automatisch aktiviert.
+- Die Bearbeitungsmaske setzt beim Eingeben eines neuen Passworts automatisch den Schalter „Anmeldung erlaubt“.
+- Ein Login kann nicht ohne hinterlegtes Passwort aktiviert werden; die Oberfläche zeigt dafür eine klare Fehlermeldung.
+- Bereits vorhandene Zugänge können weiterhin unabhängig vom Passwort deaktiviert bleiben.
+
 ## Version 28 – Hover-Beschriftungen im Urlaubskalender
 
 - Vollständige Mitarbeiternamen auf kurzen Urlaubsbalken werden beim Hover nicht mehr vom Datumsbereich verdeckt.
