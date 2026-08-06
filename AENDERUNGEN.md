@@ -321,3 +321,10 @@ Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.
 - Es werden weiterhin nur Mitarbeiter mit Urlaub im jeweiligen Monat als Zeile berücksichtigt, damit die Jahresübersicht kompakt bleibt.
 - Dezente horizontale Trennlinien verbessern die Lesbarkeit der festen Spuren.
 - Keine Datenbankänderung erforderlich.
+
+## 06.08.2026 – Feste Mitarbeiterreihenfolge zurückgenommen
+
+- Die feste alphabetische Mitarbeiterzeile innerhalb eines Monats wurde wieder entfernt.
+- Urlaubsbalken werden erneut platzsparend auf die jeweils erste freie Spur verteilt.
+- Die zusätzlichen horizontalen Spur-Trennlinien wurden entfernt.
+- Keine Datenbankänderung erforderlich.

@@ -94,29 +94,4 @@ assertVacationSegmentsSame(
     'Direkt benachbarte Einzeleinträge derselben Person müssen zu einem visuellen Balken verbunden werden'
 );
 
-
-$stableTracks = vacation_calendar_assign_employee_tracks([
-    ['employee_id' => 30, 'employee' => ['name' => 'Clara C'], 'start_day' => 2, 'end_day' => 4],
-    ['employee_id' => 10, 'employee' => ['name' => 'Anna A'], 'start_day' => 20, 'end_day' => 22],
-    ['employee_id' => 20, 'employee' => ['name' => 'Bernd B'], 'start_day' => 8, 'end_day' => 9],
-    ['employee_id' => 10, 'employee' => ['name' => 'Anna A'], 'start_day' => 3, 'end_day' => 5],
-], [10, 20, 30]);
-
-assertVacationSegmentsSame(
-    [
-        ['employee_id' => 10, 'track' => 1, 'start_day' => 3],
-        ['employee_id' => 10, 'track' => 1, 'start_day' => 20],
-        ['employee_id' => 20, 'track' => 2, 'start_day' => 8],
-        ['employee_id' => 30, 'track' => 3, 'start_day' => 2],
-    ],
-    array_map(static fn(array $segment): array => [
-        'employee_id' => (int)$segment['employee_id'],
-        'track' => (int)$segment['track'],
-        'start_day' => (int)$segment['start_day'],
-    ], $stableTracks['segments']),
-    'Jeder Mitarbeiter muss im Monat unabhängig vom Startdatum eine feste, alphabetisch geordnete Spur behalten'
-);
-
-assertVacationSegmentsSame([3], [(int)$stableTracks['track_count']], 'Die Spuranzahl muss der Zahl sichtbarer Mitarbeiter entsprechen');
-
 echo "VacationCalendarSegmentsTest: OK\n";
