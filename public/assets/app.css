@@ -3940,6 +3940,7 @@ body.vacation-range-selecting .vacation-year-board-lanes {
     --bar-start: 1;
     --bar-span: 1;
     --bar-track: 1;
+    position: relative;
     grid-column: var(--bar-start) / span var(--bar-span);
     grid-row: var(--bar-track);
     align-self: center;
@@ -3949,34 +3950,39 @@ body.vacation-range-selecting .vacation-year-board-lanes {
     min-width: 0;
     height: 16px;
     margin: 0 2px;
-    padding: 0 .35rem;
-    overflow: hidden;
+    padding: 0 .42rem;
+    overflow: visible;
     border: 0;
     border-radius: 5px;
     background: var(--employee-color);
     color: #fff;
     box-shadow: 0 4px 10px color-mix(in srgb, var(--employee-color) 24%, transparent);
     font: inherit;
-    font-size: .49rem;
+    font-size: .52rem;
     font-weight: 800;
     line-height: 1;
     text-align: left;
     white-space: nowrap;
+    transition: filter var(--wepro-transition), transform var(--wepro-transition), box-shadow var(--wepro-transition), opacity var(--wepro-transition);
 }
 
 .vacation-year-board-bar span {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-button.vacation-year-board-bar,
+#vacationCalendarRoot[data-is-admin="1"] .vacation-year-board-bar {
+    pointer-events: none;
+}
+
 div.vacation-year-board-bar[tabindex] {
     cursor: pointer;
-    transition: filter var(--wepro-transition), transform var(--wepro-transition), box-shadow var(--wepro-transition), opacity var(--wepro-transition);
 }
 
 .vacation-year-board-bar:hover,
-.vacation-year-board-bar:focus-visible {
+.vacation-year-board-bar:focus-visible,
+.vacation-year-board-bar.is-hovered {
     z-index: 6;
     color: #fff;
     filter: brightness(1.08) saturate(1.06);
@@ -3984,6 +3990,27 @@ div.vacation-year-board-bar[tabindex] {
     outline-offset: 1px;
     transform: translateY(-1px) scaleY(1.08);
     box-shadow: 0 8px 17px color-mix(in srgb, var(--employee-color) 35%, transparent);
+}
+
+.vacation-year-board-bar.is-compact-label:hover::after,
+.vacation-year-board-bar.is-compact-label:focus-visible::after,
+.vacation-year-board-bar.is-compact-label.is-hovered::after {
+    content: attr(data-full-name);
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 6px);
+    z-index: 20;
+    width: max-content;
+    max-width: 220px;
+    padding: .34rem .48rem;
+    border-radius: 7px;
+    background: var(--wepro-navy);
+    color: #fff;
+    box-shadow: 0 8px 20px rgba(16, 35, 61, .22);
+    font-size: .58rem;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: normal;
 }
 
 .vacation-year-board-bar.is-muted {
@@ -4004,6 +4031,43 @@ div.vacation-year-board-bar[tabindex] {
 .vacation-year-board-bar.is-pm {
     align-self: end;
     margin-bottom: 2px;
+}
+
+.vacation-year-board-hitbox {
+    --bar-start: 1;
+    --bar-span: 1;
+    --bar-track: 1;
+    grid-column: var(--bar-start) / span var(--bar-span);
+    grid-row: var(--bar-track);
+    align-self: center;
+    z-index: 5;
+    min-width: 0;
+    height: 18px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    cursor: pointer;
+    appearance: none;
+}
+
+.vacation-year-board-hitbox:focus-visible {
+    outline: 0;
+}
+
+.vacation-year-board-hitbox.is-half {
+    height: 11px;
+}
+
+.vacation-year-board-hitbox.is-am {
+    align-self: start;
+    margin-top: 1px;
+}
+
+.vacation-year-board-hitbox.is-pm {
+    align-self: end;
+    margin-bottom: 1px;
 }
 
 .calendar-filter-empty {

@@ -215,3 +215,93 @@ function vacation_calendar_workday_segments(string $startDate, string $endDate, 
 
     return $segments;
 }
+
+/**
+ * Combines adjacent visible vacation segments of the same employee and portion
+ * into one visual bar. The original segments are retained in `children` so an
+ * administrator can still edit every underlying database entry separately.
+ *
+ * Segments are only joined when their calendar days touch directly. Weekends
+ * and public holidays therefore remain visible gaps in the annual board.
+ *
+ * @param array<int, array<string, mixed>> $segments
+ * @return array<int, array<string, mixed>>
+ */
+function vacation_calendar_merge_visual_segments(array $segments): array
+{
+    $buckets = [];
+
+    foreach ($segments as $segment) {
+        $startDay = (int)($segment['start_day'] ?? 0);
+        $endDay = (int)($segment['end_day'] ?? 0);
+        if ($startDay < 1 || $endDay < $startDay) {
+            continue;
+        }
+
+        $employeeId = (int)($segment['employee_id'] ?? 0);
+        $portion = (string)($segment['portion'] ?? 'FULL');
+        $bucketKey = $employeeId . '|' . $portion;
+        $buckets[$bucketKey][] = $segment;
+    }
+
+    $groups = [];
+
+    foreach ($buckets as $bucketSegments) {
+        usort($bucketSegments, static function (array $a, array $b): int {
+            $startCompare = (int)$a['start_day'] <=> (int)$b['start_day'];
+            if ($startCompare !== 0) {
+                return $startCompare;
+            }
+
+            $endCompare = (int)$a['end_day'] <=> (int)$b['end_day'];
+            if ($endCompare !== 0) {
+                return $endCompare;
+            }
+
+            return (int)($a['vacation']['id'] ?? 0) <=> (int)($b['vacation']['id'] ?? 0);
+        });
+
+        $current = null;
+
+        foreach ($bucketSegments as $segment) {
+            if ($current === null) {
+                $current = $segment;
+                $current['children'] = [$segment];
+                continue;
+            }
+
+            $touchesDirectly = (int)$segment['start_day'] === ((int)$current['end_day'] + 1);
+            if ($touchesDirectly) {
+                $current['end_day'] = (int)$segment['end_day'];
+                $current['span'] = ((int)$current['end_day'] - (int)$current['start_day']) + 1;
+                $current['visible_end_date'] = (string)($segment['visible_end_date'] ?? $segment['end_date'] ?? '');
+                $current['children'][] = $segment;
+                continue;
+            }
+
+            $groups[] = $current;
+            $current = $segment;
+            $current['children'] = [$segment];
+        }
+
+        if ($current !== null) {
+            $groups[] = $current;
+        }
+    }
+
+    usort($groups, static function (array $a, array $b): int {
+        $startCompare = (int)$a['start_day'] <=> (int)$b['start_day'];
+        if ($startCompare !== 0) {
+            return $startCompare;
+        }
+
+        $endCompare = (int)$b['end_day'] <=> (int)$a['end_day'];
+        if ($endCompare !== 0) {
+            return $endCompare;
+        }
+
+        return strcmp((string)($a['employee']['name'] ?? ''), (string)($b['employee']['name'] ?? ''));
+    });
+
+    return array_values($groups);
+}

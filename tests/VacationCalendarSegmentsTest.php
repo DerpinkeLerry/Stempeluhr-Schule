@@ -44,4 +44,54 @@ assertVacationSegmentsSame(
 
 assertVacationSegmentsSame([], vacation_calendar_workday_segments('2026-02-30', '2026-03-02'), 'Ungültige Datumswerte müssen abgelehnt werden');
 
+$visualSegments = vacation_calendar_merge_visual_segments([
+    [
+        'employee_id' => 5,
+        'employee' => ['name' => 'Erika Beispiel'],
+        'portion' => 'FULL',
+        'start_day' => 3,
+        'end_day' => 3,
+        'span' => 1,
+        'visible_start_date' => '2026-08-03',
+        'visible_end_date' => '2026-08-03',
+        'vacation' => ['id' => 101],
+    ],
+    [
+        'employee_id' => 5,
+        'employee' => ['name' => 'Erika Beispiel'],
+        'portion' => 'FULL',
+        'start_day' => 4,
+        'end_day' => 5,
+        'span' => 2,
+        'visible_start_date' => '2026-08-04',
+        'visible_end_date' => '2026-08-05',
+        'vacation' => ['id' => 102],
+    ],
+    [
+        'employee_id' => 5,
+        'employee' => ['name' => 'Erika Beispiel'],
+        'portion' => 'FULL',
+        'start_day' => 8,
+        'end_day' => 8,
+        'span' => 1,
+        'visible_start_date' => '2026-08-08',
+        'visible_end_date' => '2026-08-08',
+        'vacation' => ['id' => 103],
+    ],
+]);
+
+assertVacationSegmentsSame(
+    [
+        ['start_day' => 3, 'end_day' => 5, 'span' => 3, 'children' => 2],
+        ['start_day' => 8, 'end_day' => 8, 'span' => 1, 'children' => 1],
+    ],
+    array_map(static fn(array $segment): array => [
+        'start_day' => (int)$segment['start_day'],
+        'end_day' => (int)$segment['end_day'],
+        'span' => (int)$segment['span'],
+        'children' => count($segment['children']),
+    ], $visualSegments),
+    'Direkt benachbarte Einzeleinträge derselben Person müssen zu einem visuellen Balken verbunden werden'
+);
+
 echo "VacationCalendarSegmentsTest: OK\n";

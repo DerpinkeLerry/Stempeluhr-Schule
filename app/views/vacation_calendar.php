@@ -107,7 +107,7 @@ foreach ($monthNames as $monthNumber => $monthName) {
         ];
     }
 
-    $segments = [];
+    $rawSegments = [];
     $monthEmployeeIds = [];
     $monthVacationIds = [];
     foreach ($vacations as $vacation) {
@@ -135,7 +135,7 @@ foreach ($monthNames as $monthNumber => $monthName) {
 
         foreach ($workdaySegments as $workdaySegment) {
             $span = (int)$workdaySegment['span'];
-            $segments[] = [
+            $rawSegments[] = [
                 'vacation' => $vacation,
                 'employee' => $employee,
                 'employee_id' => $employeeId,
@@ -145,24 +145,15 @@ foreach ($monthNames as $monthNumber => $monthName) {
                 'start_day' => (int)$workdaySegment['start_day'],
                 'end_day' => (int)$workdaySegment['end_day'],
                 'span' => $span,
+                'visible_start_date' => (string)$workdaySegment['start_date'],
+                'visible_end_date' => (string)$workdaySegment['end_date'],
                 'portion' => $portion,
                 'period_label' => $periodLabel($vacation),
-                'bar_label' => $span >= 4 ? $name : $employeeInitials($name),
             ];
         }
     }
 
-    usort($segments, static function (array $a, array $b): int {
-        $startCompare = $a['start_day'] <=> $b['start_day'];
-        if ($startCompare !== 0) {
-            return $startCompare;
-        }
-        $endCompare = $b['end_day'] <=> $a['end_day'];
-        if ($endCompare !== 0) {
-            return $endCompare;
-        }
-        return strcmp((string)$a['employee']['name'], (string)$b['employee']['name']);
-    });
+    $segments = vacation_calendar_merge_visual_segments($rawSegments);
 
     $trackEndDays = [];
     foreach ($segments as $index => $segment) {
@@ -171,7 +162,18 @@ foreach ($monthNames as $monthNumber => $monthName) {
             $track++;
         }
         $trackEndDays[$track] = $segment['end_day'];
+
+        $visibleStartDate = (string)($segment['visible_start_date'] ?? '');
+        $visibleEndDate = (string)($segment['visible_end_date'] ?? '');
+        $visiblePeriod = $visibleStartDate !== '' && $visibleEndDate !== ''
+            ? date('d.m.Y', strtotime($visibleStartDate))
+                . ($visibleStartDate === $visibleEndDate ? '' : ' – ' . date('d.m.Y', strtotime($visibleEndDate)))
+            : (string)$segment['period_label'];
+
         $segments[$index]['track'] = $track + 1;
+        $segments[$index]['group_id'] = 'm' . $monthNumber . '-e' . (int)$segment['employee_id'] . '-g' . ($index + 1);
+        $segments[$index]['visual_period_label'] = $visiblePeriod;
+        $segments[$index]['bar_label'] = (string)$segment['employee']['name'];
     }
 
     $yearMatrixMonths[$monthNumber] = [
@@ -418,34 +420,52 @@ foreach ($monthNames as $monthNumber => $monthName) {
 
                                 <?php foreach ($matrixMonth['segments'] as $segment): ?>
                                     <?php
-                                    $vacation = $segment['vacation'];
                                     $employee = $segment['employee'];
-                                    $portion = $segment['portion'];
-                                    $tag = $isAdmin ? 'button' : 'div';
+                                    $portion = (string)$segment['portion'];
+                                    $groupId = (string)$segment['group_id'];
+                                    $groupTitle = (string)$employee['name'] . ' · ' . (string)$segment['visual_period_label'];
+                                    $isCompactGroup = (int)$segment['span'] < 4;
                                     ?>
-                                    <<?= $tag ?>
-                                        class="vacation-year-board-bar<?= $portion !== 'FULL' ? ' is-half is-' . strtolower($portion) : '' ?><?= $isAdmin ? ' vacation-calendar-edit' : '' ?>"
+                                    <div
+                                        class="vacation-year-board-bar<?= $portion !== 'FULL' ? ' is-half is-' . strtolower($portion) : '' ?><?= $isCompactGroup ? ' is-compact-label' : '' ?>"
                                         style="--bar-start: <?= (int)$segment['start_day'] ?>; --bar-span: <?= (int)$segment['span'] ?>; --bar-track: <?= (int)$segment['track'] ?>; --employee-color: <?= h((string)$segment['color']) ?>"
-                                        title="<?= h((string)$employee['name'] . ' · ' . (string)$segment['period_label']) ?>"
+                                        title="<?= h($groupTitle) ?>"
                                         data-vacation-entry
+                                        data-vacation-visual-group
+                                        data-visual-group-id="<?= h($groupId) ?>"
+                                        data-full-name="<?= h((string)$employee['name']) ?>"
                                         data-search="<?= h((string)$segment['search']) ?>"
                                         data-employee-id="<?= (int)$segment['employee_id'] ?>"
-                                        <?php if ($isAdmin): ?>
-                                            type="button"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#vacationEditModal"
-                                            data-absence-id="<?= (int)$vacation['id'] ?>"
-                                            data-employee-name="<?= h((string)$employee['name']) ?>"
-                                            data-start-date="<?= h((string)$vacation['start_date']) ?>"
-                                            data-end-date="<?= h((string)$vacation['end_date']) ?>"
-                                            data-portion="<?= h($portion) ?>"
-                                            data-note="<?= h((string)$vacation['note']) ?>"
-                                        <?php else: ?>
-                                            tabindex="0"
-                                        <?php endif; ?>
+                                        <?= $isAdmin ? 'aria-hidden="true"' : 'tabindex="0"' ?>
                                     >
                                         <span><?= h((string)$segment['bar_label']) ?></span>
-                                    </<?= $tag ?>>
+                                    </div>
+
+                                    <?php if ($isAdmin): ?>
+                                        <?php foreach ($segment['children'] as $childSegment): ?>
+                                            <?php
+                                            $vacation = $childSegment['vacation'];
+                                            $childTitle = (string)$employee['name'] . ' · ' . (string)$childSegment['period_label'] . ' bearbeiten';
+                                            ?>
+                                            <button
+                                                class="vacation-year-board-hitbox<?= $portion !== 'FULL' ? ' is-half is-' . strtolower($portion) : '' ?> vacation-calendar-edit"
+                                                style="--bar-start: <?= (int)$childSegment['start_day'] ?>; --bar-span: <?= (int)$childSegment['span'] ?>; --bar-track: <?= (int)$segment['track'] ?>"
+                                                type="button"
+                                                title="<?= h($childTitle) ?>"
+                                                aria-label="<?= h($childTitle) ?>"
+                                                data-vacation-hitbox
+                                                data-visual-group-id="<?= h($groupId) ?>"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#vacationEditModal"
+                                                data-absence-id="<?= (int)$vacation['id'] ?>"
+                                                data-employee-name="<?= h((string)$employee['name']) ?>"
+                                                data-start-date="<?= h((string)$vacation['start_date']) ?>"
+                                                data-end-date="<?= h((string)$vacation['end_date']) ?>"
+                                                data-portion="<?= h($portion) ?>"
+                                                data-note="<?= h((string)$vacation['note']) ?>"
+                                            ></button>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
                                 <?php endforeach; ?>
                             </div>
                         </div>

@@ -789,6 +789,16 @@
         const yearMatrix = vacationCalendarRoot.querySelector('[data-year-matrix]');
         const yearMonthRows = Array.from(document.querySelectorAll('[data-year-month-row]'));
         const vacationEntries = Array.from(document.querySelectorAll('[data-vacation-entry]'));
+        const vacationHitboxes = Array.from(document.querySelectorAll('[data-vacation-hitbox]'));
+        const vacationVisualGroups = new Map(
+            vacationEntries.map(entry => [entry.dataset.visualGroupId || '', entry])
+        );
+        const vacationHitboxesByGroup = new Map();
+        vacationHitboxes.forEach(hitbox => {
+            const groupId = hitbox.dataset.visualGroupId || '';
+            if (!vacationHitboxesByGroup.has(groupId)) vacationHitboxesByGroup.set(groupId, []);
+            vacationHitboxesByGroup.get(groupId).push(hitbox);
+        });
         const employeeLegendItems = Array.from(document.querySelectorAll('[data-employee-legend]'));
         const employeeFilterButtons = Array.from(document.querySelectorAll('[data-employee-filter]'));
         const calendarEmpty = document.getElementById('vacationCalendarEmpty');
@@ -805,6 +815,9 @@
                 const matches = !query || normalizeSearch(entry.dataset.search || '').includes(query);
                 entry.hidden = !matches;
                 entry.classList.toggle('is-muted', false);
+                (vacationHitboxesByGroup.get(entry.dataset.visualGroupId || '') || []).forEach(hitbox => {
+                    hitbox.hidden = !matches;
+                });
                 if (matches) visibleEntries++;
             });
 
@@ -839,6 +852,19 @@
         employeeSearch?.addEventListener('input', filterVacationRows);
         hideFree?.addEventListener('change', filterVacationRows);
         filterVacationRows();
+
+        const setVisualGroupHover = (groupId, active) => {
+            const group = vacationVisualGroups.get(groupId || '');
+            if (group) group.classList.toggle('is-hovered', active);
+        };
+
+        vacationHitboxes.forEach(hitbox => {
+            const groupId = hitbox.dataset.visualGroupId || '';
+            hitbox.addEventListener('mouseenter', () => setVisualGroupHover(groupId, true));
+            hitbox.addEventListener('mouseleave', () => setVisualGroupHover(groupId, false));
+            hitbox.addEventListener('focus', () => setVisualGroupHover(groupId, true));
+            hitbox.addEventListener('blur', () => setVisualGroupHover(groupId, false));
+        });
 
         const syncVacationFormDates = form => {
             if (!form?.elements?.start_date || !form?.elements?.end_date || !form?.elements?.portion) return;

@@ -1,0 +1,101 @@
+{
+    "mode": "inspect",
+    "started_at": "2026-08-06T05:59:32+00:00",
+    "finished_at": "2026-08-06T05:59:32+00:00",
+    "counters": {
+        "source.breaks": 29500,
+        "source.employees": 38,
+        "source.overtime": 0,
+        "source.public_holidays": 117,
+        "source.worktime": 23951,
+        "source_table.Stempelzeiten": 5,
+        "source_table.break": 29500,
+        "source_table.conferencedate": 21,
+        "source_table.emploee": 38,
+        "source_table.massage_users": 9,
+        "source_table.massagedate": 12,
+        "source_table.overtime": 0,
+        "source_table.public_holiday": 117,
+        "source_table.toilet": 2,
+        "source_table.worktime": 23951,
+        "warnings": 5
+    },
+    "info": [],
+    "warnings": [
+        "Nicht automatisch zugeordnete MySQL-Tabelle: Stempelzeiten. Sie wird nicht veraendert und nicht importiert.",
+        "Nicht automatisch zugeordnete MySQL-Tabelle: conferencedate. Sie wird nicht veraendert und nicht importiert.",
+        "Nicht automatisch zugeordnete MySQL-Tabelle: massage_users. Sie wird nicht veraendert und nicht importiert.",
+        "Nicht automatisch zugeordnete MySQL-Tabelle: massagedate. Sie wird nicht veraendert und nicht importiert.",
+        "Nicht automatisch zugeordnete MySQL-Tabelle: toilet. Sie wird nicht veraendert und nicht importiert."
+    ],
+    "errors": [],
+    "samples": [],
+    "source_schema": {
+        "Stempelzeiten": [
+            "Wochentag",
+            "FrühesterBeginn",
+            "SpätestesEnde"
+        ],
+        "break": [
+            "id",
+            "persid",
+            "date",
+            "break_start",
+            "break_end"
+        ],
+        "conferencedate": [
+            "id",
+            "date",
+            "end_date"
+        ],
+        "emploee": [
+            "id",
+            "persid",
+            "name",
+            "holidays",
+            "unemployed",
+            "weekhours",
+            "azubi",
+            "specialtime",
+            "department",
+            "phone"
+        ],
+        "massage_users": [
+            "id",
+            "id_massage",
+            "id_emploee",
+            "date"
+        ],
+        "massagedate": [
+            "id",
+            "date"
+        ],
+        "overtime": [
+            "id",
+            "date",
+            "note"
+        ],
+        "public_holiday": [
+            "id",
+            "date",
+            "name"
+        ],
+        "toilet": [
+            "id",
+            "gender",
+            "occupied"
+        ],
+        "worktime": [
+            "id",
+            "persid",
+            "date",
+            "work_start",
+            "work_end",
+            "holiday",
+            "ill",
+            "other",
+            "halfholiday",
+            "school"
+        ]
+    }
+}

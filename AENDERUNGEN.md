@@ -1,3 +1,12 @@
+## Verbundene Urlaubsbalken im Jahreskalender (v17)
+
+- Direkt aufeinanderfolgende Urlaubseinträge derselben Person werden im Jahreskalender zu einem durchgehenden farbigen Balken verbunden.
+- Wochenenden und Feiertage bleiben weiterhin sichtbar frei und unterbrechen den Balken.
+- Der vollständige Mitarbeitername steht einmal auf dem zusammenhängenden Balken statt als wiederholte Initialen in jedem einzelnen Tagesfeld.
+- Bei kurzen Einträgen wird der vollständige Name beim Darüberfahren zusätzlich als kompakter Hinweis eingeblendet.
+- Administratoren können weiterhin jeden zugrunde liegenden Urlaubseintrag einzeln anklicken und bearbeiten.
+- Für diese Darstellung ist keine Datenbankmigration erforderlich.
+
 ## Zeitnachweise und sichtbarer Pausenmodus (v16)
 
 - Der bisherige Wochenzettel-Dialog wurde zu einem gemeinsamen Bereich **Zeitnachweise** erweitert.
