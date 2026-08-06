@@ -98,6 +98,22 @@ $tests['Übertrag verfällt nach dem 31.03. und kann später nicht verbraucht we
     );
 };
 
+$tests['Urlaubskonto trennt genommenen und zukuenftig geplanten Urlaub'] = static function (): void {
+    [$pdo, $service, &$clock, $employeeId] = vacationTestContext('2026-02-10 08:00:00');
+    $service->updateVacationAccount($employeeId, 2026, 20, 2, 0);
+    $service->createAbsence($employeeId, 'VACATION', '2026-01-05', '2026-01-05');
+    $service->createAbsence($employeeId, 'VACATION', '2026-05-04', '2026-05-08');
+
+    $account = $service->getVacationAccount($employeeId, 2026, '2026-02-10');
+
+    vacationAssertSame(1.0, (float)$account['taken_days'], 'Genommen darf nur Urlaub bis zum Stichtag enthalten');
+    vacationAssertSame(6.0, (float)$account['planned_total_days'], 'Geplant gesamt muss vergangenen und zukuenftigen Urlaub enthalten');
+    vacationAssertSame(5.0, (float)$account['planned_remaining_days'], 'Geplant Rest muss nur zukuenftige Urlaubstage enthalten');
+    vacationAssertSame(21.0, (float)$account['remaining_after_taken_days'], 'Rest muss Anspruch und noch gueltigen Uebertrag nach genommenem Urlaub enthalten');
+    vacationAssertSame(16.0, (float)$account['remaining_days'], 'Rest nach Planung muss alle genehmigten Urlaube beruecksichtigen');
+    vacationAssertSame(1.0, (float)$account['carryover_expiring_days'], 'Noch nicht verplanter Uebertrag muss als verfallend ausgewiesen werden');
+};
+
 $tests['Speichern wird bei unzureichendem Urlaub blockiert'] = static function (): void {
     [$pdo, $service, &$clock, $employeeId] = vacationTestContext('2026-08-05 08:00:00');
     $service->updateVacationAccount($employeeId, 2026, 1, 0, 0);

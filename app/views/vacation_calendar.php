@@ -528,7 +528,7 @@ foreach ($monthNames as $monthNumber => $monthName) {
                     <div>
                         <div class="eyebrow"><?= $isAdmin ? 'Kontostände' : 'Kontostand' ?> <?= (int)$year ?></div>
                         <h2><?= $isAdmin ? 'Urlaubskonten' : 'Mein Urlaubskonto' ?></h2>
-                        <p><?= $isAdmin ? 'Kompakte Übersicht aller aktiven Mitarbeiter.' : 'Anspruch, Übertrag, genommene und noch verfügbare Urlaubstage auf einen Blick.' ?></p>
+                        <p><?= $isAdmin ? 'Anspruch, Übertrag, genommene und geplante Urlaubstage sowie Resturlaub auf einen Blick.' : 'Anspruch, genommene und geplante Urlaubstage sowie Ihr aktueller Resturlaub.' ?></p>
                     </div>
                 </div>
                 <div class="vacation-account-heading-meta">
@@ -540,13 +540,29 @@ foreach ($monthNames as $monthNumber => $monthName) {
             </div>
             <div class="vacation-account-table-shell">
                 <table class="table vacation-account-table align-middle mb-0">
+                    <colgroup>
+                        <col class="vacation-account-col-person">
+                        <col class="vacation-account-col-color">
+                        <col class="vacation-account-col-value">
+                        <col class="vacation-account-col-value">
+                        <col class="vacation-account-col-value">
+                        <col class="vacation-account-col-rest">
+                        <col class="vacation-account-col-value">
+                        <col class="vacation-account-col-value">
+                        <col class="vacation-account-col-expiry">
+                        <?php if ($isAdmin): ?><col class="vacation-account-col-action"><?php endif; ?>
+                    </colgroup>
                     <thead>
                     <tr>
                         <th>Mitarbeiter</th>
-                        <th class="text-end">Anspruch</th>
+                        <th class="text-center">Farbe</th>
+                        <th class="text-end"><span title="Jahresanspruch inklusive Korrektur, ohne Übertrag">Urlaubstage</span></th>
                         <th class="text-end">Übertrag</th>
-                        <th class="text-end">Genommen</th>
-                        <th>Verfügbar</th>
+                        <th class="text-end"><span title="Bis heute tatsächlich genommene Urlaubstage">Genommen</span></th>
+                        <th><span title="Noch verfügbar nach bereits genommenem Urlaub">Rest</span></th>
+                        <th class="text-end"><span title="Alle genehmigten Urlaubstage im gewählten Jahr">Geplant gesamt</span></th>
+                        <th class="text-end"><span title="Genehmigte Urlaubstage ab morgen">Geplant Rest</span></th>
+                        <th class="text-end"><span title="Noch verfallender oder bereits verfallener Resturlaub aus dem Vorjahr">Verfall Resturlaub</span></th>
                         <?php if ($isAdmin): ?><th class="text-end"><span class="visually-hidden">Urlaubskonto öffnen</span></th><?php endif; ?>
                     </tr>
                     </thead>
@@ -559,10 +575,19 @@ foreach ($monthNames as $monthNumber => $monthName) {
 
                         $entitlement = (float)$account['entitlement_days'] + (float)$account['adjustment_days'];
                         $carryover = (float)$account['carryover_days'];
-                        $used = (float)$account['used_days'];
-                        $remaining = (float)$account['remaining_days'];
-                        $balanceBase = max(0.0, $used + max(0.0, $remaining));
-                        $remainingShare = $balanceBase > 0 ? max(0.0, min(100.0, ($remaining / $balanceBase) * 100)) : 0.0;
+                        $taken = (float)($account['taken_days'] ?? $account['used_days']);
+                        $remainingAfterTaken = (float)($account['remaining_after_taken_days'] ?? $account['remaining_days']);
+                        $plannedTotal = (float)($account['planned_total_days'] ?? $account['used_days']);
+                        $plannedRemaining = (float)($account['planned_remaining_days'] ?? max(0.0, $plannedTotal - $taken));
+                        $remainingAfterPlanning = (float)$account['remaining_days'];
+                        $carryoverExpiryValue = !empty($account['carryover_available'])
+                            ? (float)($account['carryover_expiring_days'] ?? $account['carryover_remaining_days'])
+                            : (float)$account['expired_carryover_days'];
+                        $carryoverExpiryLabel = $carryoverExpiryValue <= 0
+                            ? 'kein Übertrag'
+                            : (!empty($account['carryover_available']) ? 'bis 31.03.' : 'verfallen');
+                        $balanceBase = max(0.0, $entitlement + (!empty($account['carryover_available']) ? $carryover : 0.0));
+                        $remainingShare = $balanceBase > 0 ? max(0.0, min(100.0, ($remainingAfterPlanning / $balanceBase) * 100)) : 0.0;
                         $employeeColor = $employeeColorById[$employeeId] ?? '#3B6FD8';
                         ?>
                         <tr style="--account-color: <?= h($employeeColor) ?>; --remaining-share: <?= h(number_format($remainingShare, 2, '.', '')) ?>%">
@@ -575,21 +600,27 @@ foreach ($monthNames as $monthNumber => $monthName) {
                                     </span>
                                 </span>
                             </td>
-                            <td class="text-end"><span class="account-metric account-entitlement"><?= h(number_format($entitlement, 1, ',', '.')) ?> T</span></td>
-                            <td class="text-end">
-                                <span class="account-metric account-carryover"><?= h(number_format($carryover, 1, ',', '.')) ?> T</span>
-                                <?php if ((float)$account['expired_carryover_days'] > 0): ?>
-                                    <span class="account-expired-label" title="Nicht genutzter Übertrag ist nach dem 31.03. verfallen">verfallen</span>
-                                <?php endif; ?>
+                            <td class="text-center">
+                                <span class="vacation-account-color" title="Kalenderfarbe von <?= h((string)$employee['name']) ?>" aria-label="Kalenderfarbe von <?= h((string)$employee['name']) ?>"></span>
                             </td>
-                            <td class="text-end"><span class="account-metric account-used"><?= h(number_format($used, 1, ',', '.')) ?> T</span></td>
+                            <td class="text-end"><span class="account-metric account-entitlement"><?= h(number_format($entitlement, 1, ',', '.')) ?> T</span></td>
+                            <td class="text-end"><span class="account-metric account-carryover"><?= h(number_format($carryover, 1, ',', '.')) ?> T</span></td>
+                            <td class="text-end"><span class="account-metric account-taken"><?= h(number_format($taken, 1, ',', '.')) ?> T</span></td>
                             <td>
                                 <span class="account-balance">
                                     <span class="account-balance-label">
-                                        <strong class="account-remaining-value<?= $remaining <= 0 ? ' is-empty' : '' ?>"><?= h(number_format($remaining, 1, ',', '.')) ?> T</strong>
-                                        <small><?= h(number_format($remainingShare, 0, ',', '.')) ?> % frei</small>
+                                        <strong class="account-remaining-value<?= $remainingAfterTaken <= 0 ? ' is-empty' : '' ?>"><?= h(number_format($remainingAfterTaken, 1, ',', '.')) ?> T</strong>
+                                        <small>nach Planung <?= h(number_format($remainingAfterPlanning, 1, ',', '.')) ?> T</small>
                                     </span>
                                     <span class="account-balance-track" aria-hidden="true"><span></span></span>
+                                </span>
+                            </td>
+                            <td class="text-end"><span class="account-metric account-planned-total"><?= h(number_format($plannedTotal, 1, ',', '.')) ?> T</span></td>
+                            <td class="text-end"><span class="account-metric account-planned-open"><?= h(number_format($plannedRemaining, 1, ',', '.')) ?> T</span></td>
+                            <td class="text-end">
+                                <span class="account-expiry-value<?= $carryoverExpiryValue > 0 ? ' has-value' : '' ?>">
+                                    <strong><?= h(number_format($carryoverExpiryValue, 1, ',', '.')) ?> T</strong>
+                                    <small><?= h($carryoverExpiryLabel) ?></small>
                                 </span>
                             </td>
                             <?php if ($isAdmin): ?>

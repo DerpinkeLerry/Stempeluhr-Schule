@@ -328,3 +328,14 @@ Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.
 - Urlaubsbalken werden erneut platzsparend auf die jeweils erste freie Spur verteilt.
 - Die zusätzlichen horizontalen Spur-Trennlinien wurden entfernt.
 - Keine Datenbankänderung erforderlich.
+
+## 06.08.2026 – Urlaubskonto um Planungs- und Resturlaubsdetails erweitert
+
+- Die Urlaubskonto-Übersicht zeigt nun zusätzlich die feste Kalenderfarbe jedes Mitarbeiters.
+- „Genommen“ enthält ausschließlich Urlaubstage bis einschließlich heute.
+- „Rest“ zeigt den aktuell verfügbaren Bestand nach bereits genommenem Urlaub; darunter bleibt der Bestand nach allen genehmigten Planungen sichtbar.
+- „Geplant gesamt“ enthält alle genehmigten Urlaubstage des Jahres.
+- „Geplant Rest“ enthält ausschließlich noch bevorstehende genehmigte Urlaubstage.
+- Der Übertrag aus dem Vorjahr wird separat ausgewiesen; die Spalte „Verfall Resturlaub“ zeigt den noch verfallenden beziehungsweise bereits verfallenen Anteil.
+- Die Tabelle bleibt kompakt, erhält aber alle Informationen aus der früheren Urlaubsplan-Übersicht.
+- Keine Datenbankänderung erforderlich.

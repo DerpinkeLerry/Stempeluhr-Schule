@@ -984,31 +984,68 @@ final class TimeClockService
         }
 
         $account = $this->ensureVacationAccountRecord($employeeId, $year, $employee);
-        $usage = $this->calculateVacationUsageBreakdown($employeeId, $year, (string)$employee['holiday_region']);
-        $state = $this->vacationCapacityState(
-            (float)$account['entitlement_days'],
-            (float)$account['carryover_days'],
-            (float)$account['adjustment_days'],
-            (float)$usage['early_days'],
-            (float)$usage['late_days']
-        );
-
         $asOfDate = $asOfDate !== null && $this->validDate($asOfDate)
             ? $asOfDate
             : $this->now()->setTimezone(new DateTimeZone((string)$employee['timezone']))->format('Y-m-d');
+
+        $yearStart = sprintf('%04d-01-01', $year);
+        $yearEnd = sprintf('%04d-12-31', $year);
+        $plannedUsage = $this->calculateVacationUsageBreakdown(
+            $employeeId,
+            $year,
+            (string)$employee['holiday_region']
+        );
+        $takenUsage = ['early_days' => 0.0, 'late_days' => 0.0, 'total_days' => 0.0];
+        if ($asOfDate >= $yearStart) {
+            $takenUsage = $this->calculateVacationUsageBreakdown(
+                $employeeId,
+                $year,
+                (string)$employee['holiday_region'],
+                [],
+                min($asOfDate, $yearEnd)
+            );
+        }
+
+        $plannedState = $this->vacationCapacityState(
+            (float)$account['entitlement_days'],
+            (float)$account['carryover_days'],
+            (float)$account['adjustment_days'],
+            (float)$plannedUsage['early_days'],
+            (float)$plannedUsage['late_days']
+        );
+        $takenState = $this->vacationCapacityState(
+            (float)$account['entitlement_days'],
+            (float)$account['carryover_days'],
+            (float)$account['adjustment_days'],
+            (float)$takenUsage['early_days'],
+            (float)$takenUsage['late_days']
+        );
+
         $carryoverExpiry = sprintf('%04d-03-31', $year);
         $carryoverAvailable = $asOfDate <= $carryoverExpiry;
+        $plannedRemainingDays = max(0.0, (float)$plannedUsage['total_days'] - (float)$takenUsage['total_days']);
+        $remainingAfterTaken = (float)$takenState['entitlement_remaining_days']
+            + ($carryoverAvailable ? (float)$takenState['carryover_remaining_days'] : 0.0);
 
-        $account['used_days'] = $usage['total_days'];
-        $account['used_until_march_days'] = $usage['early_days'];
-        $account['used_after_march_days'] = $usage['late_days'];
-        $account['carryover_used_days'] = $state['carryover_used_days'];
-        $account['carryover_remaining_days'] = $state['carryover_remaining_days'];
-        $account['expired_carryover_days'] = $carryoverAvailable ? 0.0 : $state['carryover_remaining_days'];
-        $account['entitlement_remaining_days'] = $state['entitlement_remaining_days'];
-        $account['total_days'] = $state['total_days'];
-        $account['remaining_days'] = $state['entitlement_remaining_days']
-            + ($carryoverAvailable ? $state['carryover_remaining_days'] : 0.0);
+        // used_days / remaining_days bleiben aus Kompatibilitaetsgruenden die
+        // Werte nach allen bereits genehmigten Urlauben. Fuer die Uebersicht
+        // werden zusaetzlich tatsaechlich genommene und zukuenftig geplante
+        // Tage getrennt ausgewiesen.
+        $account['used_days'] = $plannedUsage['total_days'];
+        $account['used_until_march_days'] = $plannedUsage['early_days'];
+        $account['used_after_march_days'] = $plannedUsage['late_days'];
+        $account['taken_days'] = $takenUsage['total_days'];
+        $account['planned_total_days'] = $plannedUsage['total_days'];
+        $account['planned_remaining_days'] = $plannedRemainingDays;
+        $account['remaining_after_taken_days'] = $remainingAfterTaken;
+        $account['carryover_used_days'] = $plannedState['carryover_used_days'];
+        $account['carryover_remaining_days'] = $plannedState['carryover_remaining_days'];
+        $account['expired_carryover_days'] = $carryoverAvailable ? 0.0 : $plannedState['carryover_remaining_days'];
+        $account['carryover_expiring_days'] = $carryoverAvailable ? $plannedState['carryover_remaining_days'] : 0.0;
+        $account['entitlement_remaining_days'] = $plannedState['entitlement_remaining_days'];
+        $account['total_days'] = $plannedState['total_days'];
+        $account['remaining_days'] = $plannedState['entitlement_remaining_days']
+            + ($carryoverAvailable ? $plannedState['carryover_remaining_days'] : 0.0);
         $account['carryover_expiry'] = $carryoverExpiry;
         $account['carryover_available'] = $carryoverAvailable;
         return $account;
@@ -2368,13 +2405,20 @@ final class TimeClockService
         int $employeeId,
         int $year,
         string $region,
-        int|array $excludeAbsenceIds = []
+        int|array $excludeAbsenceIds = [],
+        ?string $throughDate = null
     ): array {
         $yearStart = sprintf('%04d-01-01', $year);
         $yearEnd = sprintf('%04d-12-31', $year);
+        $usageEnd = $throughDate !== null && $this->validDate($throughDate)
+            ? min($throughDate, $yearEnd)
+            : $yearEnd;
+        if ($usageEnd < $yearStart) {
+            return ['early_days' => 0.0, 'late_days' => 0.0, 'total_days' => 0.0];
+        }
         $sql = "SELECT * FROM absence
                 WHERE employee_id=? AND type='VACATION' AND start_date<=? AND end_date>=?";
-        $params = [$employeeId, $yearEnd, $yearStart];
+        $params = [$employeeId, $usageEnd, $yearStart];
         $excludeAbsenceIds = is_array($excludeAbsenceIds) ? $excludeAbsenceIds : [$excludeAbsenceIds];
         $excludeAbsenceIds = array_values(array_unique(array_filter(
             array_map('intval', $excludeAbsenceIds),
@@ -2391,7 +2435,7 @@ final class TimeClockService
         $fractions = [];
         foreach ($st->fetchAll() as $absence) {
             $start = max((string)$absence['start_date'], $yearStart);
-            $end = min((string)$absence['end_date'], $yearEnd);
+            $end = min((string)$absence['end_date'], $usageEnd);
             $current = new DateTimeImmutable($start . ' 00:00:00', new DateTimeZone('UTC'));
             $last = new DateTimeImmutable($end . ' 00:00:00', new DateTimeZone('UTC'));
             while ($current <= $last) {

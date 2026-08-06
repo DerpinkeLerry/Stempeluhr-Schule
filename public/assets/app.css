@@ -4388,29 +4388,18 @@ div.vacation-year-board-bar[tabindex] {
 .calendar-filter-empty span { color: var(--wepro-muted); font-size: .7rem; }
 
 .vacation-accounts-card {
-    max-width: 1440px;
+    max-width: 1760px;
     margin: 0 auto 1.5rem;
     background: linear-gradient(180deg, #fff 0, #f8fafc 100%);
 }
 
 .vacation-accounts-card-own {
-    max-width: 1080px;
+    max-width: 1320px;
 }
 
 .vacation-accounts-card-own .vacation-account-table-shell {
     max-height: none;
 }
-
-.vacation-accounts-card-own .vacation-account-table {
-    min-width: 760px;
-}
-
-.vacation-accounts-card-own .vacation-account-table th:first-child { width: 30%; }
-.vacation-accounts-card-own .vacation-account-table th:nth-child(2) { width: 14%; }
-.vacation-accounts-card-own .vacation-account-table th:nth-child(3) { width: 15%; }
-.vacation-accounts-card-own .vacation-account-table th:nth-child(4) { width: 14%; }
-.vacation-accounts-card-own .vacation-account-table th:nth-child(5),
-.vacation-accounts-card-own .vacation-account-table th:last-child { width: 27%; }
 
 .vacation-account-heading {
     align-items: center;
@@ -4502,16 +4491,16 @@ div.vacation-year-board-bar[tabindex] {
 }
 
 .vacation-account-table {
-    min-width: 850px;
+    min-width: 1250px;
     table-layout: fixed;
 }
 
-.vacation-account-table th:first-child { width: 31%; }
-.vacation-account-table th:nth-child(2) { width: 13%; }
-.vacation-account-table th:nth-child(3) { width: 15%; }
-.vacation-account-table th:nth-child(4) { width: 13%; }
-.vacation-account-table th:nth-child(5) { width: 22%; }
-.vacation-account-table th:last-child { width: 6%; }
+.vacation-account-col-person { width: 230px; }
+.vacation-account-col-color { width: 62px; }
+.vacation-account-col-value { width: 104px; }
+.vacation-account-col-rest { width: 180px; }
+.vacation-account-col-expiry { width: 126px; }
+.vacation-account-col-action { width: 54px; }
 
 .vacation-account-table > :not(caption) > * > * {
     padding: .52rem .72rem;
@@ -4526,6 +4515,8 @@ div.vacation-year-board-bar[tabindex] {
     padding-bottom: .55rem;
     background: #edf2f7;
     color: #6b7a8d;
+    line-height: 1.2;
+    white-space: normal;
     box-shadow: 0 1px 0 var(--wepro-line-strong);
 }
 
@@ -4541,8 +4532,7 @@ div.vacation-year-board-bar[tabindex] {
     background: #fff7e8;
 }
 
-.vacation-account-table th:not(:first-child),
-.vacation-account-table td:not(:first-child) {
+.vacation-account-table tbody td:not(:first-child) {
     white-space: nowrap;
 }
 
@@ -4597,6 +4587,16 @@ div.vacation-year-board-bar[tabindex] {
     white-space: nowrap;
 }
 
+.vacation-account-color {
+    display: inline-block;
+    width: 34px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, .92);
+    border-radius: 6px;
+    background: var(--account-color);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--account-color) 38%, #cbd5e1), 0 3px 8px color-mix(in srgb, var(--account-color) 18%, transparent);
+}
+
 .account-metric {
     display: inline-flex;
     align-items: center;
@@ -4622,10 +4622,22 @@ div.vacation-year-board-bar[tabindex] {
     color: #7250c8;
 }
 
-.account-used {
+.account-taken {
     border-color: rgba(199, 131, 22, .14);
     background: var(--wepro-warning-soft);
     color: #a76e13;
+}
+
+.account-planned-total {
+    border-color: rgba(57, 115, 168, .14);
+    background: #eaf2fb;
+    color: #376b9c;
+}
+
+.account-planned-open {
+    border-color: rgba(20, 138, 112, .14);
+    background: #e9f7f3;
+    color: #168267;
 }
 
 .account-balance {
@@ -4684,6 +4696,39 @@ div.vacation-year-board-bar[tabindex] {
     font-weight: 800;
     letter-spacing: .03em;
     text-transform: uppercase;
+}
+
+.account-expiry-value {
+    display: inline-grid;
+    justify-items: end;
+    gap: .05rem;
+    min-width: 74px;
+    padding: .25rem .45rem;
+    border: 1px solid rgba(148, 163, 184, .18);
+    border-radius: 8px;
+    background: #f5f7fa;
+    color: var(--wepro-muted);
+}
+
+.account-expiry-value strong {
+    color: var(--wepro-navy-2);
+    font-size: .62rem;
+}
+
+.account-expiry-value small {
+    font-size: .46rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.account-expiry-value.has-value {
+    border-color: rgba(203, 75, 87, .16);
+    background: var(--wepro-danger-soft);
+    color: var(--wepro-danger);
+}
+
+.account-expiry-value.has-value strong {
+    color: var(--wepro-danger);
 }
 
 .vacation-account-open {
