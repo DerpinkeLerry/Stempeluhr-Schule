@@ -1,3 +1,9 @@
+## Version 28 – Hover-Beschriftungen im Urlaubskalender
+
+- Vollständige Mitarbeiternamen auf kurzen Urlaubsbalken werden beim Hover nicht mehr vom Datumsbereich verdeckt.
+- Die schwebende Beschriftung darf nun sichtbar über den Tageskopf ragen und liegt dabei zuverlässig über dem Kalenderkopf.
+- Keine Datenbankänderung erforderlich.
+
 ## Kompakter Arbeitszeiten-Planer in Mitarbeiterdetails (v26)
 
 - Urlaubskonto und Arbeitszeiten-Planer nutzen den verfügbaren Platz nun im Verhältnis 4:8 statt 5:7.
@@ -286,4 +292,16 @@ Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.
 
 - Namen und Initialen auf sämtlichen farbigen Urlaubsbalken werden unabhängig von der Mitarbeiterfarbe immer weiß dargestellt.
 - Die weiße Beschriftung gilt ebenfalls bei Hover und Fokus.
+- Keine Datenbankänderung erforderlich.
+
+## 06.08.2026 – Abwesenheiten mit individueller Tageszeit angerechnet
+
+- Urlaub, Krankheit, Schule und sonstige Abwesenheiten schreiben für den jeweiligen Tag automatisch die im Arbeitszeiten-Planer hinterlegte Sollzeit gut.
+- Ein Mitarbeiter mit beispielsweise 7 geplanten Stunden erhält bei einer ganztägigen Abwesenheit exakt 7:00 Stunden angerechnet.
+- Halbe Urlaubstage rechnen die Hälfte der geplanten Tageszeit an.
+- Planmäßig freie Tage bleiben bei 0:00 Stunden.
+- Ganztägige Abwesenheit und tatsächlich erfasste Arbeit werden nicht doppelt gezählt; bei halben Urlaubstagen wird die halbe Gutschrift zusätzlich zur realen Arbeitszeit berücksichtigt.
+- Feiertage rechnen an geplanten Arbeitstagen ebenfalls die individuell hinterlegte Tageszeit an.
+- Die Tagesanzeige in Mitarbeiterübersicht und Mitarbeiterprofil berücksichtigt die Abwesenheits- beziehungsweise Feiertagsgutschrift nun ebenfalls.
+- Historische Import-Gutschriften überschreiben die aktuelle, zum jeweiligen Datum gültige Arbeitszeitplanung nicht mehr.
 - Keine Datenbankänderung erforderlich.

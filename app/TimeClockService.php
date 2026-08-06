@@ -227,7 +227,33 @@ final class TimeClockService
 
     public static function calculateAbsenceCreditSeconds(int $isoWeekday): int
     {
-        return self::fixedTargetMinutesForWeekday($isoWeekday) * 60;
+        return self::calculateScheduledAbsenceCreditSeconds(
+            self::fixedTargetMinutesForWeekday($isoWeekday),
+            'FULL'
+        );
+    }
+
+    public static function calculateScheduledAbsenceCreditSeconds(
+        int $scheduledMinutes,
+        string $portion = 'FULL',
+        bool $hasWorkSession = false
+    ): int {
+        $scheduledSeconds = max(0, $scheduledMinutes) * 60;
+        if ($scheduledSeconds === 0) {
+            return 0;
+        }
+
+        $portion = strtoupper(trim($portion));
+        if ($portion === 'FULL') {
+            // Ein ganzer Abwesenheitstag ersetzt die geplante Arbeitszeit nur,
+            // solange an diesem Tag nicht tatsächlich gearbeitet wurde.
+            return $hasWorkSession ? 0 : $scheduledSeconds;
+        }
+        if ($portion === 'AM' || $portion === 'PM') {
+            return (int)round($scheduledSeconds / 2);
+        }
+
+        return 0;
     }
 
     public static function absenceRangesAfterWorkedDay(string $startDate, string $endDate, string $workedDay): array
@@ -709,6 +735,11 @@ final class TimeClockService
             return [
                 'gross_seconds' => 0,
                 'break_seconds' => 0,
+                'recorded_net_seconds' => 0,
+                'credited_seconds' => 0,
+                'absence_credit_seconds' => 0,
+                'holiday_credit_seconds' => 0,
+                'scheduled_seconds' => 0,
                 'net_seconds' => 0,
                 'break_allowance_seconds' => 0,
                 'break_bonus_seconds' => 0,
@@ -744,8 +775,9 @@ final class TimeClockService
         }
 
         $localNow = $this->now()->setTimezone(new DateTimeZone($employee['timezone']));
+        $today = $localNow->format('Y-m-d');
         $rule = $this->getWorkRule((int)$localNow->format('N'));
-        $scheduledMinutes = $this->getScheduledMinutesForDate($employeeId, $localNow->format('Y-m-d'));
+        $scheduledMinutes = $this->getScheduledMinutesForDate($employeeId, $today);
         $baseBreakSeconds = $scheduledMinutes > self::BASE_BREAK_THRESHOLD_MINUTES ? self::BASE_BREAK_SECONDS : 0;
         $breakAllowanceSeconds = $baseBreakSeconds;
         if ($firstTodayStart !== null) {
@@ -753,10 +785,30 @@ final class TimeClockService
             $breakAllowanceSeconds = $this->calculateBreakAllowanceForRule($localWorkStart, $rule, $scheduledMinutes);
         }
 
+        $recordedNetSeconds = self::calculateNetSeconds($gross, $breakSeconds);
+        $absenceCreditSeconds = 0;
+        $holidayCreditSeconds = 0;
+        $absence = $this->findAbsence($employeeId, $today);
+        if ($absence) {
+            $absenceCreditSeconds = self::calculateScheduledAbsenceCreditSeconds(
+                $scheduledMinutes,
+                (string)($absence['portion'] ?? 'FULL'),
+                $gross > 0
+            );
+        } elseif ($gross === 0 && $this->isHoliday((string)$employee['holiday_region'], $today)) {
+            $holidayCreditSeconds = max(0, $scheduledMinutes) * 60;
+        }
+        $creditedSeconds = max($absenceCreditSeconds, $holidayCreditSeconds);
+
         return [
             'gross_seconds' => $gross,
             'break_seconds' => $breakSeconds,
-            'net_seconds' => self::calculateNetSeconds($gross, $breakSeconds),
+            'recorded_net_seconds' => $recordedNetSeconds,
+            'credited_seconds' => $creditedSeconds,
+            'absence_credit_seconds' => $absenceCreditSeconds,
+            'holiday_credit_seconds' => $holidayCreditSeconds,
+            'scheduled_seconds' => max(0, $scheduledMinutes) * 60,
+            'net_seconds' => $recordedNetSeconds + $creditedSeconds,
             'break_allowance_seconds' => $breakAllowanceSeconds,
             'break_bonus_seconds' => max(0, $breakAllowanceSeconds - $baseBreakSeconds),
             'break_remaining_seconds' => $breakAllowanceSeconds - $breakSeconds,
@@ -1597,16 +1649,11 @@ final class TimeClockService
                     }
                 }
 
-                if ($absence['credit_minutes_override'] !== null) {
-                    $credit = (int)$absence['credit_minutes_override'] * 60;
-                } elseif ($portion === 'FULL') {
-                    $credit = $plannedSeconds;
-                } else {
-                    $credit = (int)round($plannedSeconds / 2);
-                }
-                if ($portion === 'FULL' && $hasWorkSession) {
-                    $credit = 0;
-                }
+                $credit = self::calculateScheduledAbsenceCreditSeconds(
+                    intdiv($plannedSeconds, 60),
+                    $portion,
+                    $hasWorkSession
+                );
                 $absenceCredit = max($absenceCredit, $credit);
             }
 

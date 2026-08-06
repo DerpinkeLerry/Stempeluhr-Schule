@@ -4127,11 +4127,14 @@ textarea {
 
 .vacation-year-board-lanes {
     position: relative;
+    z-index: 4;
     grid-template-rows: repeat(var(--track-count), 21px);
     align-items: stretch;
     min-height: calc((var(--track-count) * 21px) + 14px);
     padding: 7px 0;
-    overflow: hidden;
+    /* Hover labels may extend into the date header. Keep them visible and
+       above the header instead of clipping them at the lane boundary. */
+    overflow: visible;
 }
 
 .vacation-year-board-background {

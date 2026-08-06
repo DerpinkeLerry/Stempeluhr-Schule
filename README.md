@@ -76,7 +76,7 @@ Die mitgelieferte Datenbank ist bereits auf Version 6 vorbereitet.
 - Mitarbeiter werden beim Entfernen nur deaktiviert. Historische Daten bleiben erhalten.
 - Neue Mitarbeiter starten mit 38 Wochenstunden: Montag bis Donnerstag jeweils 8:30 Stunden, Freitag 4:00 Stunden.
 - Jeder Wochentag kann individuell angepasst oder vollständig als freier Tag ausgeschaltet werden. Änderungen gelten ab einem wählbaren Datum und verändern keine Vergangenheit.
-- Urlaub, Krankheit, Schule, sonstige Abwesenheiten und Feiertage werden an eingeplanten Arbeitstagen mit der individuell hinterlegten Tageszeit angerechnet.
+- Urlaub, Krankheit, Schule, sonstige Abwesenheiten und Feiertage werden an eingeplanten Arbeitstagen mit der zum jeweiligen Datum gültigen individuellen Tageszeit angerechnet. Ganztägige Abwesenheiten ersetzen die geplante Tageszeit, halbe Urlaubstage rechnen die Hälfte an; planmäßig freie Tage bleiben bei 0 Stunden.
 - Bei mehr als 6 geplanten Stunden werden 30 Minuten Pausenanspruch berücksichtigt. Arbeitsbeginn vor 08:00 Uhr erhöht diesen Wert zusätzlich um die entsprechende Frühstartzeit.
 - Urlaub wird aus den genehmigten Abwesenheiten berechnet; halbe Tage zählen als `0,5`.
 - Ungenutzter regulärer Jahresurlaub wird automatisch ins Folgejahr übertragen. Dieser Übertrag kann nur für Urlaubstage bis einschließlich 31. März verwendet werden und verfällt danach.

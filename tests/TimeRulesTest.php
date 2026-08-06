@@ -83,6 +83,27 @@ assertRule(
     'Abwesenheit darf samstags nicht automatisch angerechnet werden'
 );
 
+assertRule(
+    TimeClockService::calculateScheduledAbsenceCreditSeconds(420, 'FULL') === 7 * 3600,
+    'Ein ganzer Abwesenheitstag muss exakt die individuell geplanten 7 Stunden anrechnen'
+);
+assertRule(
+    TimeClockService::calculateScheduledAbsenceCreditSeconds(420, 'AM') === 3 * 3600 + 30 * 60,
+    'Ein halber Abwesenheitstag muss die Hälfte der individuell geplanten Zeit anrechnen'
+);
+assertRule(
+    TimeClockService::calculateScheduledAbsenceCreditSeconds(420, 'PM', true) === 3 * 3600 + 30 * 60,
+    'Bei einem halben Abwesenheitstag bleibt die halbe Gutschrift zusätzlich zu echter Arbeit erhalten'
+);
+assertRule(
+    TimeClockService::calculateScheduledAbsenceCreditSeconds(420, 'FULL', true) === 0,
+    'Ein ganzer Abwesenheitstag darf bei tatsächlicher Arbeit nicht zusätzlich doppelt angerechnet werden'
+);
+assertRule(
+    TimeClockService::calculateScheduledAbsenceCreditSeconds(0, 'FULL') === 0,
+    'An einem planmäßig freien Tag darf keine Abwesenheitszeit angerechnet werden'
+);
+
 $middleRanges = TimeClockService::absenceRangesAfterWorkedDay('2026-07-27', '2026-07-31', '2026-07-30');
 assertRule(
     $middleRanges === [
