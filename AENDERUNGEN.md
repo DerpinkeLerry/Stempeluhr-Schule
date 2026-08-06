@@ -1,3 +1,12 @@
+## Ausgewogene Mitarbeiterfarben im Urlaubskalender (v22)
+
+- Die sehr kräftige Neon-Palette wurde durch eine ausgewogene, moderne Farbpalette ersetzt.
+- Die Farben bleiben deutlich voneinander unterscheidbar, wirken aber ruhiger und angenehmer.
+- Hover-Effekt, Konturen und Schatten wurden ebenfalls etwas zurückgenommen.
+- Lesbare helle oder dunkle Schrift wird weiterhin passend zur jeweiligen Farbe verwendet.
+- Farblegende, Urlaubsbalken und Urlaubskonten behalten dieselbe feste Farbe je Mitarbeiter.
+- Für diese Darstellung ist keine Datenbankmigration erforderlich.
+
 ## Kräftigere Mitarbeiterfarben im Urlaubskalender (v21)
 
 - Die bisherigen gedeckten Farben wurden durch eine stark gesättigte, kontrastreiche Farbpalette ersetzt.

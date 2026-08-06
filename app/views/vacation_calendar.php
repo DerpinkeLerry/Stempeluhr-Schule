@@ -59,33 +59,33 @@ if (!$isAdmin) {
     }
 }
 
-// A vivid, deliberately wide-spread palette makes employees easy to distinguish
-// even from a distance. Bright colors receive a dark label, darker colors a white one.
+// A balanced palette keeps employees clearly distinguishable without looking neon.
+// The sequence alternates warm and cool hues; text colors are selected for contrast.
 $employeePalette = [
-    ['background' => '#0057FF', 'foreground' => '#FFFFFF'], // electric blue
-    ['background' => '#FF5A00', 'foreground' => '#FFFFFF'], // vivid orange
-    ['background' => '#E10098', 'foreground' => '#FFFFFF'], // fuchsia
-    ['background' => '#7ED321', 'foreground' => '#142600'], // lime green
-    ['background' => '#7A00FF', 'foreground' => '#FFFFFF'], // violet
-    ['background' => '#00C7D9', 'foreground' => '#062A31'], // cyan
-    ['background' => '#D90000', 'foreground' => '#FFFFFF'], // signal red
-    ['background' => '#FFD400', 'foreground' => '#2A2200'], // bright yellow
-    ['background' => '#008F8C', 'foreground' => '#FFFFFF'], // strong teal
-    ['background' => '#FF2D95', 'foreground' => '#FFFFFF'], // hot pink
-    ['background' => '#003F88', 'foreground' => '#FFFFFF'], // deep blue
-    ['background' => '#FF8A00', 'foreground' => '#2C1700'], // tangerine
-    ['background' => '#C6FF00', 'foreground' => '#1D2900'], // chartreuse
-    ['background' => '#4338CA', 'foreground' => '#FFFFFF'], // indigo
-    ['background' => '#00A86B', 'foreground' => '#FFFFFF'], // emerald
-    ['background' => '#FF6B6B', 'foreground' => '#321010'], // coral
-    ['background' => '#A000FF', 'foreground' => '#FFFFFF'], // electric purple
-    ['background' => '#00E5FF', 'foreground' => '#062B33'], // aqua
-    ['background' => '#B0005A', 'foreground' => '#FFFFFF'], // raspberry
-    ['background' => '#0094FF', 'foreground' => '#FFFFFF'], // sky blue
-    ['background' => '#FF1744', 'foreground' => '#FFFFFF'], // neon red
-    ['background' => '#007A4D', 'foreground' => '#FFFFFF'], // deep emerald
-    ['background' => '#5B00B5', 'foreground' => '#FFFFFF'], // deep purple
-    ['background' => '#00B83F', 'foreground' => '#06240E'], // neon green
+    ['background' => '#3B6FD8', 'foreground' => '#FFFFFF'], // royal blue
+    ['background' => '#E17835', 'foreground' => '#0F172A'], // warm orange
+    ['background' => '#C4478D', 'foreground' => '#FFFFFF'], // berry pink
+    ['background' => '#4B9A61', 'foreground' => '#0F172A'], // fresh green
+    ['background' => '#7756C7', 'foreground' => '#FFFFFF'], // violet
+    ['background' => '#2D98A8', 'foreground' => '#0F172A'], // cyan teal
+    ['background' => '#C94549', 'foreground' => '#FFFFFF'], // clear red
+    ['background' => '#D5A62A', 'foreground' => '#0F172A'], // golden amber
+    ['background' => '#187F75', 'foreground' => '#FFFFFF'], // deep teal
+    ['background' => '#CF3F78', 'foreground' => '#FFFFFF'], // raspberry pink
+    ['background' => '#355C9A', 'foreground' => '#FFFFFF'], // deep blue
+    ['background' => '#E38A42', 'foreground' => '#0F172A'], // tangerine
+    ['background' => '#77A441', 'foreground' => '#0F172A'], // leaf green
+    ['background' => '#5867C9', 'foreground' => '#FFFFFF'], // indigo
+    ['background' => '#2B9A72', 'foreground' => '#0F172A'], // emerald
+    ['background' => '#DD6B65', 'foreground' => '#0F172A'], // coral
+    ['background' => '#934EC2', 'foreground' => '#FFFFFF'], // purple
+    ['background' => '#3D9DCA', 'foreground' => '#0F172A'], // sky blue
+    ['background' => '#B64268', 'foreground' => '#FFFFFF'], // raspberry
+    ['background' => '#3375AE', 'foreground' => '#FFFFFF'], // azure
+    ['background' => '#C34455', 'foreground' => '#FFFFFF'], // rose red
+    ['background' => '#387D60', 'foreground' => '#FFFFFF'], // forest green
+    ['background' => '#6550AF', 'foreground' => '#FFFFFF'], // deep violet
+    ['background' => '#3E9A4F', 'foreground' => '#0F172A'], // meadow green
 ];
 $employeeById = [];
 $employeeColorById = [];
@@ -93,8 +93,8 @@ $employeeTextColorById = [];
 foreach ($employees as $employee) {
     $employeeId = (int)$employee['id'];
     $employeeById[$employeeId] = $employee;
-    // Consecutive employee IDs intentionally receive alternating warm, cool and
-    // bright hues. The assignment stays stable when the list is filtered or sorted.
+    // Consecutive employee IDs receive alternating warm and cool hues. The assignment
+    // stays stable when the list is filtered or sorted.
     $paletteIndex = max(0, $employeeId - 1) % count($employeePalette);
     $employeeColorById[$employeeId] = $employeePalette[$paletteIndex]['background'];
     $employeeTextColorById[$employeeId] = $employeePalette[$paletteIndex]['foreground'];
@@ -320,7 +320,7 @@ foreach ($monthNames as $monthNumber => $monthName) {
                 <?php foreach ($employees as $employee): ?>
                     <?php
                     $employeeId = (int)$employee['id'];
-                    $employeeColor = $employeeColorById[$employeeId] ?? '#0057FF';
+                    $employeeColor = $employeeColorById[$employeeId] ?? '#3B6FD8';
                     $employeeTextColor = $employeeTextColorById[$employeeId] ?? '#FFFFFF';
                     $searchText = trim((string)$employee['name'] . ' ' . (string)$employee['department'] . ' ' . (string)$employee['personnel_number']);
                     $hasVacationInYear = !empty($vacationsByEmployee[$employeeId]);
@@ -563,7 +563,7 @@ foreach ($monthNames as $monthNumber => $monthName) {
                         $remaining = (float)$account['remaining_days'];
                         $balanceBase = max(0.0, $used + max(0.0, $remaining));
                         $remainingShare = $balanceBase > 0 ? max(0.0, min(100.0, ($remaining / $balanceBase) * 100)) : 0.0;
-                        $employeeColor = $employeeColorById[$employeeId] ?? '#0057FF';
+                        $employeeColor = $employeeColorById[$employeeId] ?? '#3B6FD8';
                         ?>
                         <tr style="--account-color: <?= h($employeeColor) ?>; --remaining-share: <?= h(number_format($remainingShare, 2, '.', '')) ?>%">
                             <td>
