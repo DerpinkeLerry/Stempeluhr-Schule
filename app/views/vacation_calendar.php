@@ -78,7 +78,7 @@ foreach ($employees as $employee) {
     $employeeColorById[$employeeId] = $employeePalette[$paletteIndex];
 }
 
-// The full-year view follows the compact planning-board model of the legacy
+// The full-year view follows the compact planning-board model of the previous
 // calendar: months run vertically, days horizontally, and overlapping vacations
 // are placed on the smallest possible number of tracks.
 $yearMatrixMonths = [];

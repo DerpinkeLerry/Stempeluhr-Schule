@@ -22,7 +22,6 @@ PHP-Anwendung zur Arbeitszeit-, Pausen-, Abwesenheits- und Urlaubsverwaltung mit
 - Wochen-, Monats- und Jahresnachweise als PDF; jede Person erhält genau eine eigene, druckfertige Seite
 - deutliche orange Pausenansicht, damit ein laufender Pausenstatus auch aus größerer Entfernung erkennbar ist
 - Feiertage für Bayern/Kaufbeuren von 2025 bis 2035
-- vorbereitete Legacy-IDs für den späteren Import aus der alten MySQL-Stempeluhr
 
 ## Voraussetzungen
 
@@ -69,7 +68,7 @@ Die vollständige Tabellenbeschreibung steht in:
 database/STRUCTURE.md
 ```
 
-Die mitgelieferte Datenbank ist bereits auf Version 4 vorbereitet. Der Import aus der alten MySQL-Stempeluhr bleibt weiterhin optional über die Werkzeuge im Ordner `tools` möglich.
+Die mitgelieferte Datenbank ist bereits auf Version 4 vorbereitet.
 
 ## Wichtige Datenregeln
 
@@ -103,12 +102,12 @@ Diese Passwörter müssen vor einem Unternehmenseinsatz geändert werden. Die au
 
 ## Tests
 
-Reine Zeitregeln und Importlogik:
+Reine Regeltests:
 
 ```bash
 php tests/TimeRulesTest.php
-php tests/LegacyImportTransformTest.php
-php tests/LegacyImporterSourceSafetyTest.php
+php tests/VacationCalendarSegmentsTest.php
+php tests/TimeReportPdfTest.php
 ```
 
 Integrationstests mit aktiviertem PDO_SQLite:
@@ -135,24 +134,3 @@ data/                SQLite-Datenbank
 public/              einziger öffentlicher Webordner
 tests/               Regel- und Integrationstests
 ```
-
-## Import aus der alten MySQL-Stempeluhr
-
-Ein read-only MySQL-Importer ist unter `tools/import_mysql.php` enthalten. Er kopiert Mitarbeiter, Arbeitszeiten, Pausen, Abwesenheiten, Urlaubsansprüche, Feiertage und optional Überstunden in die neue SQLite-Struktur. Die alte MySQL-Datenbank wird nicht verändert.
-
-Die vollständige Schritt-für-Schritt-Anleitung steht in:
-
-```text
-tools/README_MYSQL_IMPORT.md
-```
-
-Grundablauf:
-
-```bat
-tools\mysql-import.php bearbeiten
-tools\import_mysql.bat --inspect
-tools\import_mysql.bat --dry-run
-tools\import_mysql.bat --execute
-```
-
-Der Echtimport erstellt automatisch eine SQLite-Sicherung und läuft innerhalb einer Transaktion. Legacy-IDs verhindern Duplikate bei wiederholten Läufen.

@@ -44,8 +44,8 @@ function migrate_database(PDO $pdo): void
     $version = (int)$pdo->query('PRAGMA user_version')->fetchColumn();
     $coreSchemaCurrent = table_has_column($pdo, 'employee', 'personnel_number')
         && table_has_column($pdo, 'employee', 'weekly_hours')
-        && table_has_column($pdo, 'work_session', 'legacy_worktime_id')
-        && table_has_column($pdo, 'break_session', 'legacy_break_id')
+        && table_has_column($pdo, 'work_session', 'note')
+        && table_has_column($pdo, 'break_session', 'source')
         && table_has_column($pdo, 'absence', 'portion')
         && table_has_column($pdo, 'public_holiday', 'source');
 
@@ -75,7 +75,6 @@ function migrate_database(PDO $pdo): void
         $pdo->exec("CREATE TABLE employee_new (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             personnel_number TEXT UNIQUE COLLATE NOCASE,
-            legacy_employee_id INTEGER UNIQUE,
             name TEXT NOT NULL,
             email TEXT UNIQUE COLLATE NOCASE,
             password_hash TEXT NOT NULL DEFAULT '',
@@ -97,7 +96,6 @@ function migrate_database(PDO $pdo): void
         $employeeSelect = [
             column_expression($employeeColumns, 'id', 'NULL'),
             column_expression($employeeColumns, 'personnel_number', 'NULL'),
-            column_expression($employeeColumns, 'legacy_employee_id', 'NULL'),
             column_expression($employeeColumns, 'name', "''"),
             column_expression($employeeColumns, 'email', 'NULL'),
             column_expression($employeeColumns, 'password_hash', "''"),
@@ -115,7 +113,7 @@ function migrate_database(PDO $pdo): void
             column_expression($employeeColumns, 'created_at', $nowExpression),
             column_expression($employeeColumns, 'updated_at', column_expression($employeeColumns, 'created_at', $nowExpression)),
         ];
-        $pdo->exec('INSERT INTO employee_new(id, personnel_number, legacy_employee_id, name, email, password_hash, role, timezone, holiday_region, department, phone, weekly_hours, is_trainee, special_time, active, login_enabled, must_change_password, created_at, updated_at) SELECT ' . implode(', ', $employeeSelect) . ' FROM employee');
+        $pdo->exec('INSERT INTO employee_new(id, personnel_number, name, email, password_hash, role, timezone, holiday_region, department, phone, weekly_hours, is_trainee, special_time, active, login_enabled, must_change_password, created_at, updated_at) SELECT ' . implode(', ', $employeeSelect) . ' FROM employee');
 
         $pdo->exec("CREATE TABLE work_session_new (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -123,7 +121,6 @@ function migrate_database(PDO $pdo): void
             started_at TEXT NOT NULL,
             ended_at TEXT,
             source TEXT NOT NULL DEFAULT 'web',
-            legacy_worktime_id INTEGER UNIQUE,
             note TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -137,12 +134,11 @@ function migrate_database(PDO $pdo): void
                 column_expression($workColumns, 'started_at', $nowExpression),
                 column_expression($workColumns, 'ended_at', 'NULL'),
                 column_expression($workColumns, 'source', "'web'"),
-                column_expression($workColumns, 'legacy_worktime_id', 'NULL'),
                 column_expression($workColumns, 'note', "''"),
                 column_expression($workColumns, 'created_at', column_expression($workColumns, 'started_at', $nowExpression)),
                 column_expression($workColumns, 'updated_at', "COALESCE(" . column_expression($workColumns, 'ended_at', 'NULL') . ', ' . column_expression($workColumns, 'started_at', $nowExpression) . ')'),
             ];
-            $pdo->exec('INSERT INTO work_session_new(id, employee_id, started_at, ended_at, source, legacy_worktime_id, note, created_at, updated_at) SELECT ' . implode(', ', $workSelect) . ' FROM work_session');
+            $pdo->exec('INSERT INTO work_session_new(id, employee_id, started_at, ended_at, source, note, created_at, updated_at) SELECT ' . implode(', ', $workSelect) . ' FROM work_session');
         }
 
         $pdo->exec("CREATE TABLE break_session_new (
@@ -151,7 +147,6 @@ function migrate_database(PDO $pdo): void
             started_at TEXT NOT NULL,
             ended_at TEXT,
             source TEXT NOT NULL DEFAULT 'web',
-            legacy_break_id INTEGER UNIQUE,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(work_session_id) REFERENCES work_session(id) ON DELETE CASCADE,
@@ -164,11 +159,10 @@ function migrate_database(PDO $pdo): void
                 column_expression($breakColumns, 'started_at', $nowExpression),
                 column_expression($breakColumns, 'ended_at', 'NULL'),
                 column_expression($breakColumns, 'source', "'web'"),
-                column_expression($breakColumns, 'legacy_break_id', 'NULL'),
                 column_expression($breakColumns, 'created_at', column_expression($breakColumns, 'started_at', $nowExpression)),
                 column_expression($breakColumns, 'updated_at', "COALESCE(" . column_expression($breakColumns, 'ended_at', 'NULL') . ', ' . column_expression($breakColumns, 'started_at', $nowExpression) . ')'),
             ];
-            $pdo->exec('INSERT INTO break_session_new(id, work_session_id, started_at, ended_at, source, legacy_break_id, created_at, updated_at) SELECT ' . implode(', ', $breakSelect) . ' FROM break_session');
+            $pdo->exec('INSERT INTO break_session_new(id, work_session_id, started_at, ended_at, source, created_at, updated_at) SELECT ' . implode(', ', $breakSelect) . ' FROM break_session');
         }
 
         $pdo->exec("CREATE TABLE absence_new (
@@ -180,7 +174,6 @@ function migrate_database(PDO $pdo): void
             end_date TEXT NOT NULL,
             note TEXT NOT NULL DEFAULT '',
             source TEXT NOT NULL DEFAULT 'web',
-            legacy_worktime_id INTEGER UNIQUE,
             credit_minutes_override INTEGER CHECK(credit_minutes_override IS NULL OR credit_minutes_override >= 0),
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -199,13 +192,12 @@ function migrate_database(PDO $pdo): void
                 column_expression($absenceColumns, 'end_date', "'1970-01-01'"),
                 column_expression($absenceColumns, 'note', "''"),
                 column_expression($absenceColumns, 'source', "'web'"),
-                column_expression($absenceColumns, 'legacy_worktime_id', 'NULL'),
                 column_expression($absenceColumns, 'credit_minutes_override', 'NULL'),
                 column_expression($absenceColumns, 'created_at', $nowExpression),
                 column_expression($absenceColumns, 'updated_at', column_expression($absenceColumns, 'created_at', $nowExpression)),
             ];
             $where = in_array('status', $absenceColumns, true) ? " WHERE status <> 'REJECTED'" : '';
-            $pdo->exec('INSERT INTO absence_new(id, employee_id, type, portion, start_date, end_date, note, source, legacy_worktime_id, credit_minutes_override, created_at, updated_at) SELECT ' . implode(', ', $absenceSelect) . ' FROM absence' . $where);
+            $pdo->exec('INSERT INTO absence_new(id, employee_id, type, portion, start_date, end_date, note, source, credit_minutes_override, created_at, updated_at) SELECT ' . implode(', ', $absenceSelect) . ' FROM absence' . $where);
         }
 
         $pdo->exec("CREATE TABLE public_holiday_new (
@@ -214,7 +206,6 @@ function migrate_database(PDO $pdo): void
             day TEXT NOT NULL,
             name TEXT NOT NULL,
             source TEXT NOT NULL DEFAULT 'system',
-            legacy_public_holiday_id INTEGER UNIQUE,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(region, day, name)
@@ -226,11 +217,10 @@ function migrate_database(PDO $pdo): void
                 column_expression($holidayColumns, 'day', "'1970-01-01'"),
                 column_expression($holidayColumns, 'name', "''"),
                 column_expression($holidayColumns, 'source', "'system'"),
-                column_expression($holidayColumns, 'legacy_public_holiday_id', 'NULL'),
                 column_expression($holidayColumns, 'created_at', $nowExpression),
                 column_expression($holidayColumns, 'updated_at', column_expression($holidayColumns, 'created_at', $nowExpression)),
             ];
-            $pdo->exec('INSERT OR IGNORE INTO public_holiday_new(id, region, day, name, source, legacy_public_holiday_id, created_at, updated_at) SELECT ' . implode(', ', $holidaySelect) . ' FROM public_holiday');
+            $pdo->exec('INSERT OR IGNORE INTO public_holiday_new(id, region, day, name, source, created_at, updated_at) SELECT ' . implode(', ', $holidaySelect) . ' FROM public_holiday');
         }
 
         foreach (['break_session', 'absence', 'work_session', 'employee', 'public_holiday'] as $table) {

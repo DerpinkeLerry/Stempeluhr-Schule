@@ -1,7 +1,6 @@
 CREATE TABLE IF NOT EXISTS employee (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     personnel_number TEXT UNIQUE COLLATE NOCASE,
-    legacy_employee_id INTEGER UNIQUE,
     name TEXT NOT NULL,
     email TEXT UNIQUE COLLATE NOCASE,
     password_hash TEXT NOT NULL DEFAULT '',
@@ -46,7 +45,6 @@ CREATE TABLE IF NOT EXISTS vacation_account (
     adjustment_days REAL NOT NULL DEFAULT 0,
     note TEXT NOT NULL DEFAULT '',
     source TEXT NOT NULL DEFAULT 'web',
-    legacy_entitlement_days REAL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(employee_id) REFERENCES employee(id) ON DELETE CASCADE,
@@ -69,7 +67,6 @@ CREATE TABLE IF NOT EXISTS work_session (
     started_at TEXT NOT NULL,
     ended_at TEXT,
     source TEXT NOT NULL DEFAULT 'web',
-    legacy_worktime_id INTEGER UNIQUE,
     note TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -83,7 +80,6 @@ CREATE TABLE IF NOT EXISTS break_session (
     started_at TEXT NOT NULL,
     ended_at TEXT,
     source TEXT NOT NULL DEFAULT 'web',
-    legacy_break_id INTEGER UNIQUE,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(work_session_id) REFERENCES work_session(id) ON DELETE CASCADE,
@@ -99,7 +95,6 @@ CREATE TABLE IF NOT EXISTS absence (
     end_date TEXT NOT NULL,
     note TEXT NOT NULL DEFAULT '',
     source TEXT NOT NULL DEFAULT 'web',
-    legacy_worktime_id INTEGER UNIQUE,
     credit_minutes_override INTEGER CHECK(credit_minutes_override IS NULL OR credit_minutes_override >= 0),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -153,7 +148,6 @@ CREATE TABLE IF NOT EXISTS public_holiday (
     day TEXT NOT NULL,
     name TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT 'system',
-    legacy_public_holiday_id INTEGER UNIQUE,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(region, day, name)
@@ -165,19 +159,8 @@ CREATE TABLE IF NOT EXISTS overtime_event (
     note TEXT NOT NULL DEFAULT '',
     credit_minutes INTEGER NOT NULL DEFAULT 0,
     source TEXT NOT NULL DEFAULT 'web',
-    legacy_overtime_id INTEGER UNIQUE,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS import_batch (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    source_system TEXT NOT NULL,
-    source_reference TEXT NOT NULL DEFAULT '',
-    status TEXT NOT NULL DEFAULT 'RUNNING' CHECK(status IN ('RUNNING', 'SUCCESS', 'FAILED')),
-    started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    finished_at TEXT,
-    summary TEXT NOT NULL DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS idx_employee_personnel_number ON employee(personnel_number);

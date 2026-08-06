@@ -23,4 +23,3 @@ Prüfergebnis:
 - PRAGMA foreign_key_check: keine Fehler
 - PRAGMA user_version: 2
 
-Der Alt-Datenbank-Importer für die frühere MySQL-Stempeluhr ist noch nicht enthalten.
