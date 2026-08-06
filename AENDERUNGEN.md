@@ -1,3 +1,11 @@
+## Kräftigere Mitarbeiterfarben im Urlaubskalender (v21)
+
+- Die bisherigen gedeckten Farben wurden durch eine stark gesättigte, kontrastreiche Farbpalette ersetzt.
+- Aufeinanderfolgende Mitarbeiter erhalten bewusst abwechselnde warme, kalte und sehr helle Farbtöne.
+- Für helle Farben verwendet der Kalender automatisch dunkle Schrift, für dunkle Farben weiße Schrift.
+- Farblegende, Urlaubsbalken und Urlaubskonten verwenden weiterhin dieselbe feste Farbe je Mitarbeiter.
+- Für diese Darstellung ist keine Datenbankmigration erforderlich.
+
 ## Verbundene Urlaubsbalken im Jahreskalender (v17)
 
 - Direkt aufeinanderfolgende Urlaubseinträge derselben Person werden im Jahreskalender zu einem durchgehenden farbigen Balken verbunden.

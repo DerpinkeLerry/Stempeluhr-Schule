@@ -59,23 +59,45 @@ if (!$isAdmin) {
     }
 }
 
-// A stable, high-contrast employee palette keeps every person recognizable in
-// the annual calendar. The same employee receives the same color for the whole page.
+// A vivid, deliberately wide-spread palette makes employees easy to distinguish
+// even from a distance. Bright colors receive a dark label, darker colors a white one.
 $employeePalette = [
-    '#2F6FED', '#1C9A72', '#8B5CF6', '#E56B3F', '#C9446B', '#5F8D3E',
-    '#1687A7', '#8A6D3B', '#D9485F', '#3F7CAC', '#00A896', '#A855F7',
-    '#D97706', '#4F7D3A', '#2563A9', '#B4537A', '#5B6EC7', '#2B8A66',
-    '#C75D2C', '#7C5DB3', '#3D8D9B', '#A15C38', '#596F2D', '#9C3D54',
+    ['background' => '#0057FF', 'foreground' => '#FFFFFF'], // electric blue
+    ['background' => '#FF5A00', 'foreground' => '#FFFFFF'], // vivid orange
+    ['background' => '#E10098', 'foreground' => '#FFFFFF'], // fuchsia
+    ['background' => '#7ED321', 'foreground' => '#142600'], // lime green
+    ['background' => '#7A00FF', 'foreground' => '#FFFFFF'], // violet
+    ['background' => '#00C7D9', 'foreground' => '#062A31'], // cyan
+    ['background' => '#D90000', 'foreground' => '#FFFFFF'], // signal red
+    ['background' => '#FFD400', 'foreground' => '#2A2200'], // bright yellow
+    ['background' => '#008F8C', 'foreground' => '#FFFFFF'], // strong teal
+    ['background' => '#FF2D95', 'foreground' => '#FFFFFF'], // hot pink
+    ['background' => '#003F88', 'foreground' => '#FFFFFF'], // deep blue
+    ['background' => '#FF8A00', 'foreground' => '#2C1700'], // tangerine
+    ['background' => '#C6FF00', 'foreground' => '#1D2900'], // chartreuse
+    ['background' => '#4338CA', 'foreground' => '#FFFFFF'], // indigo
+    ['background' => '#00A86B', 'foreground' => '#FFFFFF'], // emerald
+    ['background' => '#FF6B6B', 'foreground' => '#321010'], // coral
+    ['background' => '#A000FF', 'foreground' => '#FFFFFF'], // electric purple
+    ['background' => '#00E5FF', 'foreground' => '#062B33'], // aqua
+    ['background' => '#B0005A', 'foreground' => '#FFFFFF'], // raspberry
+    ['background' => '#0094FF', 'foreground' => '#FFFFFF'], // sky blue
+    ['background' => '#FF1744', 'foreground' => '#FFFFFF'], // neon red
+    ['background' => '#007A4D', 'foreground' => '#FFFFFF'], // deep emerald
+    ['background' => '#5B00B5', 'foreground' => '#FFFFFF'], // deep purple
+    ['background' => '#00B83F', 'foreground' => '#06240E'], // neon green
 ];
 $employeeById = [];
 $employeeColorById = [];
+$employeeTextColorById = [];
 foreach ($employees as $employee) {
     $employeeId = (int)$employee['id'];
     $employeeById[$employeeId] = $employee;
-    // Multiplication by 7 distributes consecutive IDs across the palette while
-    // keeping the color stable even when employees are re-sorted or added.
-    $paletteIndex = (($employeeId * 7) + 3) % count($employeePalette);
-    $employeeColorById[$employeeId] = $employeePalette[$paletteIndex];
+    // Consecutive employee IDs intentionally receive alternating warm, cool and
+    // bright hues. The assignment stays stable when the list is filtered or sorted.
+    $paletteIndex = max(0, $employeeId - 1) % count($employeePalette);
+    $employeeColorById[$employeeId] = $employeePalette[$paletteIndex]['background'];
+    $employeeTextColorById[$employeeId] = $employeePalette[$paletteIndex]['foreground'];
 }
 
 // The full-year view follows the compact planning-board model of the previous
@@ -141,6 +163,7 @@ foreach ($monthNames as $monthNumber => $monthName) {
                 'employee_id' => $employeeId,
                 'search' => trim($name . ' ' . (string)$employee['department'] . ' ' . (string)$employee['personnel_number']),
                 'color' => $employeeColorById[$employeeId],
+                'text_color' => $employeeTextColorById[$employeeId],
                 'initials' => $employeeInitials($name),
                 'start_day' => (int)$workdaySegment['start_day'],
                 'end_day' => (int)$workdaySegment['end_day'],
@@ -297,7 +320,8 @@ foreach ($monthNames as $monthNumber => $monthName) {
                 <?php foreach ($employees as $employee): ?>
                     <?php
                     $employeeId = (int)$employee['id'];
-                    $employeeColor = $employeeColorById[$employeeId] ?? '#2F6FED';
+                    $employeeColor = $employeeColorById[$employeeId] ?? '#0057FF';
+                    $employeeTextColor = $employeeTextColorById[$employeeId] ?? '#FFFFFF';
                     $searchText = trim((string)$employee['name'] . ' ' . (string)$employee['department'] . ' ' . (string)$employee['personnel_number']);
                     $hasVacationInYear = !empty($vacationsByEmployee[$employeeId]);
                     ?>
@@ -305,7 +329,7 @@ foreach ($monthNames as $monthNumber => $monthName) {
                         class="vacation-employee-key-item"
                         type="button"
                         role="listitem"
-                        style="--employee-color: <?= h($employeeColor) ?>"
+                        style="--employee-color: <?= h($employeeColor) ?>; --employee-text-color: <?= h($employeeTextColor) ?>"
                         data-employee-legend
                         data-employee-filter="<?= h((string)$employee['name']) ?>"
                         data-search="<?= h($searchText) ?>"
@@ -428,7 +452,7 @@ foreach ($monthNames as $monthNumber => $monthName) {
                                     ?>
                                     <div
                                         class="vacation-year-board-bar<?= $portion !== 'FULL' ? ' is-half is-' . strtolower($portion) : '' ?><?= $isCompactGroup ? ' is-compact-label' : '' ?>"
-                                        style="--bar-start: <?= (int)$segment['start_day'] ?>; --bar-span: <?= (int)$segment['span'] ?>; --bar-track: <?= (int)$segment['track'] ?>; --employee-color: <?= h((string)$segment['color']) ?>"
+                                        style="--bar-start: <?= (int)$segment['start_day'] ?>; --bar-span: <?= (int)$segment['span'] ?>; --bar-track: <?= (int)$segment['track'] ?>; --employee-color: <?= h((string)$segment['color']) ?>; --employee-text-color: <?= h((string)$segment['text_color']) ?>"
                                         title="<?= h($groupTitle) ?>"
                                         data-vacation-entry
                                         data-vacation-visual-group
@@ -539,7 +563,7 @@ foreach ($monthNames as $monthNumber => $monthName) {
                         $remaining = (float)$account['remaining_days'];
                         $balanceBase = max(0.0, $used + max(0.0, $remaining));
                         $remainingShare = $balanceBase > 0 ? max(0.0, min(100.0, ($remaining / $balanceBase) * 100)) : 0.0;
-                        $employeeColor = $employeeColorById[$employeeId] ?? '#2F6FED';
+                        $employeeColor = $employeeColorById[$employeeId] ?? '#0057FF';
                         ?>
                         <tr style="--account-color: <?= h($employeeColor) ?>; --remaining-share: <?= h(number_format($remainingShare, 2, '.', '')) ?>%">
                             <td>
