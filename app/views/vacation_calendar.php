@@ -60,32 +60,32 @@ if (!$isAdmin) {
 }
 
 // A balanced palette keeps employees clearly distinguishable without looking neon.
-// The sequence alternates warm and cool hues; text colors are selected for contrast.
+// The sequence alternates warm and cool hues; labels always use white text.
 $employeePalette = [
     ['background' => '#3B6FD8', 'foreground' => '#FFFFFF'], // royal blue
-    ['background' => '#E17835', 'foreground' => '#0F172A'], // warm orange
+    ['background' => '#E17835', 'foreground' => '#FFFFFF'], // warm orange
     ['background' => '#C4478D', 'foreground' => '#FFFFFF'], // berry pink
-    ['background' => '#4B9A61', 'foreground' => '#0F172A'], // fresh green
+    ['background' => '#4B9A61', 'foreground' => '#FFFFFF'], // fresh green
     ['background' => '#7756C7', 'foreground' => '#FFFFFF'], // violet
-    ['background' => '#2D98A8', 'foreground' => '#0F172A'], // cyan teal
+    ['background' => '#2D98A8', 'foreground' => '#FFFFFF'], // cyan teal
     ['background' => '#C94549', 'foreground' => '#FFFFFF'], // clear red
-    ['background' => '#D5A62A', 'foreground' => '#0F172A'], // golden amber
+    ['background' => '#D5A62A', 'foreground' => '#FFFFFF'], // golden amber
     ['background' => '#187F75', 'foreground' => '#FFFFFF'], // deep teal
     ['background' => '#CF3F78', 'foreground' => '#FFFFFF'], // raspberry pink
     ['background' => '#355C9A', 'foreground' => '#FFFFFF'], // deep blue
-    ['background' => '#E38A42', 'foreground' => '#0F172A'], // tangerine
-    ['background' => '#77A441', 'foreground' => '#0F172A'], // leaf green
+    ['background' => '#E38A42', 'foreground' => '#FFFFFF'], // tangerine
+    ['background' => '#77A441', 'foreground' => '#FFFFFF'], // leaf green
     ['background' => '#5867C9', 'foreground' => '#FFFFFF'], // indigo
-    ['background' => '#2B9A72', 'foreground' => '#0F172A'], // emerald
-    ['background' => '#DD6B65', 'foreground' => '#0F172A'], // coral
+    ['background' => '#2B9A72', 'foreground' => '#FFFFFF'], // emerald
+    ['background' => '#DD6B65', 'foreground' => '#FFFFFF'], // coral
     ['background' => '#934EC2', 'foreground' => '#FFFFFF'], // purple
-    ['background' => '#3D9DCA', 'foreground' => '#0F172A'], // sky blue
+    ['background' => '#3D9DCA', 'foreground' => '#FFFFFF'], // sky blue
     ['background' => '#B64268', 'foreground' => '#FFFFFF'], // raspberry
     ['background' => '#3375AE', 'foreground' => '#FFFFFF'], // azure
     ['background' => '#C34455', 'foreground' => '#FFFFFF'], // rose red
     ['background' => '#387D60', 'foreground' => '#FFFFFF'], // forest green
     ['background' => '#6550AF', 'foreground' => '#FFFFFF'], // deep violet
-    ['background' => '#3E9A4F', 'foreground' => '#0F172A'], // meadow green
+    ['background' => '#3E9A4F', 'foreground' => '#FFFFFF'], // meadow green
 ];
 $employeeById = [];
 $employeeColorById = [];

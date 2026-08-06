@@ -250,3 +250,9 @@ Die bestehende Zeitlogik und alle zuvor behobenen Funktionen bleiben erhalten.
 - Angezeigt werden Anspruch, Resturlaub-Übertrag, genommene und noch verfügbare Tage.
 - Urlaubskonten anderer Mitarbeiter bleiben weiterhin ausschließlich für Administratoren sichtbar.
 - Die Mitarbeiteransicht ist rein lesend; administrative Kontobearbeitung bleibt geschützt.
+
+## 06.08.2026 – Einheitlich weiße Schrift im Urlaubskalender
+
+- Namen und Initialen auf sämtlichen farbigen Urlaubsbalken werden unabhängig von der Mitarbeiterfarbe immer weiß dargestellt.
+- Die weiße Beschriftung gilt ebenfalls bei Hover und Fokus.
+- Keine Datenbankänderung erforderlich.

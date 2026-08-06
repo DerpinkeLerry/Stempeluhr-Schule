@@ -3955,7 +3955,7 @@ body.vacation-range-selecting .vacation-year-board-lanes {
     border: 1px solid color-mix(in srgb, var(--employee-color) 70%, #172337);
     border-radius: 5px;
     background: var(--employee-color);
-    color: var(--employee-text-color, #fff);
+    color: #fff;
     text-shadow: 0 1px 1px rgba(0, 0, 0, .16);
     box-shadow: 0 4px 10px color-mix(in srgb, var(--employee-color) 24%, transparent);
     font: inherit;
@@ -3985,7 +3985,7 @@ div.vacation-year-board-bar[tabindex] {
 .vacation-year-board-bar:focus-visible,
 .vacation-year-board-bar.is-hovered {
     z-index: 6;
-    color: var(--employee-text-color, #fff);
+    color: #fff;
     filter: brightness(1.04) saturate(1.06);
     outline: 2px solid #fff;
     outline-offset: 1px;
