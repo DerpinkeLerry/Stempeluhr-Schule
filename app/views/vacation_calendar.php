@@ -458,11 +458,13 @@ foreach ($monthNames as $monthNumber => $monthName) {
                                         data-vacation-visual-group
                                         data-visual-group-id="<?= h($groupId) ?>"
                                         data-full-name="<?= h((string)$employee['name']) ?>"
+                                        data-initials="<?= h((string)$segment['initials']) ?>"
+                                        data-compact-label="<?= $isCompactGroup ? '1' : '0' ?>"
                                         data-search="<?= h((string)$segment['search']) ?>"
                                         data-employee-id="<?= (int)$segment['employee_id'] ?>"
                                         <?= $isAdmin ? 'aria-hidden="true"' : 'tabindex="0"' ?>
                                     >
-                                        <span><?= h((string)$segment['bar_label']) ?></span>
+                                        <span data-vacation-bar-label><?= h((string)$segment['bar_label']) ?></span>
                                     </div>
 
                                     <?php if ($isAdmin): ?>

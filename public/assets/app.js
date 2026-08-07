@@ -867,6 +867,34 @@
         const employeeFilterButtons = Array.from(document.querySelectorAll('[data-employee-filter]'));
         const calendarEmpty = document.getElementById('vacationCalendarEmpty');
 
+        let vacationBarLabelFrame = 0;
+        const syncVacationBarLabels = () => {
+            if (vacationBarLabelFrame) cancelAnimationFrame(vacationBarLabelFrame);
+            vacationBarLabelFrame = requestAnimationFrame(() => {
+                vacationBarLabelFrame = 0;
+                vacationEntries.forEach(entry => {
+                    const label = entry.querySelector('[data-vacation-bar-label]');
+                    if (!label) return;
+
+                    const fullName = entry.dataset.fullName || '';
+                    const initials = entry.dataset.initials || fullName;
+                    label.textContent = fullName;
+                    entry.classList.remove('is-initial-label');
+                    entry.classList.toggle('is-compact-label', entry.dataset.compactLabel === '1');
+
+                    if (entry.hidden || entry.offsetParent === null) return;
+
+                    // Only half-day bars use initials. Full-day vacation always keeps
+                    // the employee name and may shorten it visually with an ellipsis if
+                    // a very short range physically cannot contain the complete text.
+                    if (entry.classList.contains('is-half')) {
+                        label.textContent = initials;
+                        entry.classList.add('is-initial-label', 'is-compact-label');
+                    }
+                });
+            });
+        };
+
         const filterVacationRows = () => {
             if (!yearMatrix) return;
 
@@ -901,6 +929,7 @@
             });
 
             if (calendarEmpty) calendarEmpty.hidden = visibleMonths > 0 && (!query || visibleEntries > 0);
+            syncVacationBarLabels();
         };
 
         employeeFilterButtons.forEach(button => {
@@ -916,6 +945,13 @@
         employeeSearch?.addEventListener('input', filterVacationRows);
         hideFree?.addEventListener('change', filterVacationRows);
         filterVacationRows();
+
+        if (typeof ResizeObserver !== 'undefined' && yearMatrix) {
+            const vacationBarResizeObserver = new ResizeObserver(syncVacationBarLabels);
+            vacationBarResizeObserver.observe(yearMatrix);
+        } else {
+            window.addEventListener('resize', syncVacationBarLabels);
+        }
 
         const setVisualGroupHover = (groupId, active) => {
             const group = vacationVisualGroups.get(groupId || '');

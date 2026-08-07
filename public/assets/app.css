@@ -323,8 +323,8 @@ textarea {
 .vacation-page-container {
     width: 100%;
     max-width: none;
-    padding-right: clamp(1rem, 2.2vw, 2.75rem);
-    padding-left: clamp(1rem, 2.2vw, 2.75rem);
+    padding-right: clamp(.6rem, 1.2vw, 1.5rem);
+    padding-left: clamp(.6rem, 1.2vw, 1.5rem);
 }
 
 .site-footer {
@@ -3954,7 +3954,7 @@ textarea {
 }
 
 .vacation-year-board-month {
-    --month-label-width: 148px;
+    --month-label-width: 116px;
     display: grid;
     grid-template-columns: var(--month-label-width) minmax(0, 1fr);
     border-bottom: 1px solid var(--wepro-line-strong);
@@ -3978,12 +3978,12 @@ textarea {
     left: 0;
     z-index: 7;
     display: grid;
-    grid-template-columns: 28px minmax(0, 1fr);
+    grid-template-columns: 24px minmax(0, 1fr);
     grid-template-rows: auto auto;
     align-content: center;
-    column-gap: .55rem;
+    column-gap: .42rem;
     min-width: 0;
-    padding: 1rem .85rem;
+    padding: .9rem .55rem;
     border-right: 1px solid var(--wepro-line-strong);
     background: linear-gradient(90deg, #fff 88%, rgba(255, 255, 255, .92));
     color: inherit;
@@ -3995,8 +3995,8 @@ textarea {
     display: grid;
     place-items: center;
     align-self: center;
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     border-radius: 9px;
     background: var(--wepro-paper);
     color: var(--wepro-muted);
@@ -4013,7 +4013,7 @@ textarea {
     align-self: end;
     overflow: hidden;
     color: var(--wepro-navy);
-    font-size: .75rem;
+    font-size: .72rem;
     line-height: 1.15;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -4023,8 +4023,8 @@ textarea {
     align-self: start;
     overflow: hidden;
     color: var(--wepro-muted);
-    font-size: .52rem;
-    line-height: 1.25;
+    font-size: .48rem;
+    line-height: 1.2;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -4274,9 +4274,30 @@ body.vacation-range-selecting .vacation-year-board-lanes {
 }
 
 .vacation-year-board-bar span {
+    display: block;
+    flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* Full-day vacation keeps the employee name. Slightly tighter horizontal
+   padding leaves more usable text width in short vacation ranges. */
+.vacation-year-board-bar:not(.is-half) {
+    padding-inline: .32rem;
+}
+
+.vacation-year-board-bar.is-initial-label {
+    justify-content: center;
+    padding-inline: .18rem;
+    text-align: center;
+}
+
+.vacation-year-board-bar.is-initial-label span {
+    flex: 0 1 auto;
+    max-width: 100%;
+    text-align: center;
+    letter-spacing: .02em;
 }
 
 #vacationCalendarRoot[data-is-admin="1"] .vacation-year-board-bar {
@@ -4325,19 +4346,23 @@ div.vacation-year-board-bar[tabindex] {
 }
 
 .vacation-year-board-bar.is-half {
-    height: 8px;
-    border: 1px solid color-mix(in srgb, var(--employee-color) 68%, #172337);
-    background: repeating-linear-gradient(135deg, var(--employee-color) 0 4px, color-mix(in srgb, var(--employee-color) 72%, #fff) 4px 8px);
+    width: calc(50% - 2px);
+    height: 16px;
+    padding-inline: .26rem;
+    border: 1px solid color-mix(in srgb, var(--employee-color) 70%, #172337);
+    background: var(--employee-color);
 }
 
 .vacation-year-board-bar.is-am {
-    align-self: start;
-    margin-top: 2px;
+    justify-self: start;
+    align-self: center;
+    margin: 0 0 0 2px;
 }
 
 .vacation-year-board-bar.is-pm {
-    align-self: end;
-    margin-bottom: 2px;
+    justify-self: end;
+    align-self: center;
+    margin: 0 2px 0 0;
 }
 
 .vacation-year-board-hitbox {
@@ -4364,17 +4389,18 @@ div.vacation-year-board-bar[tabindex] {
 }
 
 .vacation-year-board-hitbox.is-half {
-    height: 11px;
+    width: 50%;
+    height: 18px;
 }
 
 .vacation-year-board-hitbox.is-am {
-    align-self: start;
-    margin-top: 1px;
+    justify-self: start;
+    align-self: center;
 }
 
 .vacation-year-board-hitbox.is-pm {
-    align-self: end;
-    margin-bottom: 1px;
+    justify-self: end;
+    align-self: center;
 }
 
 .calendar-filter-empty {
@@ -5426,7 +5452,7 @@ div.vacation-year-board-bar[tabindex] {
     }
 
     .vacation-year-board-month {
-        --month-label-width: 132px;
+        --month-label-width: 108px;
     }
 
     .vacation-year-board-days,
